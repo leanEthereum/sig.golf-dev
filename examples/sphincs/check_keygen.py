@@ -1,6 +1,6 @@
 """Costly, full-image keygen comparison; run only after changing keygen code."""
 
-from examples.sphincs.build_verify import CACHE, PUBLIC_KEY, SECRET_KEY, build_keygen
+from examples.sphincs.build_images import CACHE, PUBLIC_KEY, SECRET_KEY, build_keygen
 from examples.sphincs.check_verify import Machine
 from examples.sphincs.reference import CACHE_BYTES, Oracle, SIG_BYTES, keygen
 

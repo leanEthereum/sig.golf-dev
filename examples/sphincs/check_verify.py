@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 
-from examples.sphincs.build_verify import SIGNATURE, WITNESS, build, build_expand
+from examples.sphincs.build_images import SIGNATURE, WITNESS, build, build_expand
 from examples.sphincs.reference import (
     Oracle, keygen, layer_address, message_index, parse_signature, sign, verify,
     SIG_BYTES, VERIFY_COMPRESSIONS,
