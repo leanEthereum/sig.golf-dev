@@ -61,6 +61,16 @@ inductive OrdinarySteps (image : Image) : MachineState → Nat → MachineState 
       (tail : OrdinarySteps image next steps final) :
       OrdinarySteps image state (steps + 1) final
 
+theorem OrdinarySteps.append {image : Image} {first middle final : MachineState}
+    {before after : Nat} (left : OrdinarySteps image first before middle)
+    (right : OrdinarySteps image middle after final) :
+    OrdinarySteps image first (before + after) final := by
+  induction left with
+  | refl => simpa using right
+  | step state next middle instruction steps hf hs tail ih =>
+      simpa [Nat.succ_add, Nat.add_assoc] using
+        OrdinarySteps.step state next final instruction (steps + after) hf hs (ih right)
+
 theorem OrdinarySteps.then_executes {hash : Hash} {image : Image} {state next : MachineState}
     {count steps : Nat} {result : Execution} (block : OrdinarySteps image state count next)
     (tail : Executes hash image next steps result) :

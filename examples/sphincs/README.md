@@ -14,7 +14,7 @@ This is not a beta submission yet. The abstract 24-tree scheme has a Lean securi
 
 `SigGolfCandidate/SphincsBridge.lean` proves the abstract byte-string oracle inputs pack injectively into the organizer's length-tagged bit-vector queries, preserving commitment domain separation. `SigGolfCandidate/SphincsVerifierCommitment.lean` proves the exact verifier entry jump reaches `0x1010`, identifies the first HASH instruction at `0x1130`, and shows that a state satisfying the prepared-input invariant sends the correct 60-byte commitment query for eight cycles. Establishing that invariant across the intervening straight-line instructions is still open.
 
-`SigGolfCandidate/SphincsVerifierPrefix.lean` now exposes a checked 77-word prefix of the exact image and proves the first four setup instructions execute, zeroing the layer scratch word. This is the start of the missing straight-line refinement, not a proof of the entire prefix.
+`SigGolfCandidate/SphincsVerifierPrefix.lean` exposes a checked 77-word prefix of the exact image. `SigGolfCandidate/SphincsVerifierSlots.lean` proves the entry jump and the next 16 instructions execute, zeroing all four commitment-header scratch words. This is the start of the missing straight-line refinement, not a proof of the entire prefix.
 
 The verifier uses 1,616 HASH compressions on an accepting run. Differential tests observe `159,530 + r` executed instructions and `171,173 + r` cycles, where `r` is the number of right turns across 192 FORS and 34 hypertree nodes. Thus the candidate cycle bound is 171,399 and its proposed score is 1,940,922,276. These figures still need a proof about the exact image; tests alone do not certify them.
 
