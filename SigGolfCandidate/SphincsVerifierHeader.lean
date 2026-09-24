@@ -24,7 +24,7 @@ open SigGolfCandidate.SphincsVerifierCopyMemory
     (register : Reg) :
     (state.setMem address value).getReg register = state.getReg register := rfl
 
-def tagState (state : MachineState) : MachineState :=
+def tagBeforeStore (state : MachineState) : MachineState :=
   let state := execInstrBr state (.LUI .x6 0x1)
   let state := execInstrBr state (.ADDI .x6 .x6 (-767))
   let state := execInstrBr state (.LUI .x28 0x43)
@@ -33,8 +33,10 @@ def tagState (state : MachineState) : MachineState :=
   let state := execInstrBr state (.SLLI .x7 .x7 16)
   let state := execInstrBr state (.ADD .x6 .x6 .x7)
   let state := execInstrBr state (.LUI .x7 0x40)
-  let state := execInstrBr state (.ADDI .x7 .x7 0)
-  execInstrBr state (.SW .x7 .x6 0)
+  execInstrBr state (.ADDI .x7 .x7 0)
+
+def tagState (state : MachineState) : MachineState :=
+  execInstrBr (tagBeforeStore state) (.SW .x7 .x6 0)
 
 theorem tag_block (state : MachineState) (pc : state.pc = 0x10c0) :
     OrdinarySteps SphincsImages.verify state 10 (tagState state) := by
@@ -99,12 +101,12 @@ theorem tag_block (state : MachineState) (pc : state.pc = 0x10c0) :
 
 theorem tag_next_pc (state : MachineState) (pc : state.pc = 0x10c0) :
     (tagState state).pc = 0x10e8 := by
-  simp [tagState, execInstrBr, MachineState.setPC, pc]
+  simp [tagState, tagBeforeStore, execInstrBr, MachineState.setPC, pc]
 
 theorem tag_value (state : MachineState)
     (layerZero : state.getMem 0x43000 = 0) :
     (tagState state).getWord32 0x40000 = 0xd01 := by
-  simp [tagState, execInstrBr, signExtend12,
+  simp [tagState, tagBeforeStore, execInstrBr, signExtend12,
     getWord32_setWord32_same, MachineState.getReg_setReg_eq,
     MachineState.getReg_setReg_ne]
   have zero : state.getMem (274432#64) = 0 := by
@@ -116,14 +118,25 @@ theorem tag_value (state : MachineState)
 
 theorem tag_hash_pointer (state : MachineState) :
     (tagState state).getReg .x7 = 0x40000 := by
-  simp [tagState, execInstrBr, signExtend12,
+  simp [tagState, tagBeforeStore, execInstrBr, signExtend12,
     MachineState.getReg_setReg_eq, MachineState.getReg_setReg_ne]
 
-def positionState (state : MachineState) : MachineState :=
+theorem tagBeforeStore_memory (state : MachineState) (address : Word) :
+    (tagBeforeStore state).getMem address = state.getMem address := by
+  simp [tagBeforeStore, execInstrBr]
+
+theorem tagBeforeStore_pointer (state : MachineState) :
+    (tagBeforeStore state).getReg .x7 = 0x40000 := by
+  simp [tagBeforeStore, execInstrBr, signExtend12,
+    MachineState.getReg_setReg_eq, MachineState.getReg_setReg_ne]
+
+def positionBeforeStore (state : MachineState) : MachineState :=
   let state := execInstrBr state (.LUI .x28 0x43)
   let state := execInstrBr state (.ADDI .x28 .x28 16)
-  let state := execInstrBr state (.LD .x6 .x28 0)
-  execInstrBr state (.SW .x7 .x6 4)
+  execInstrBr state (.LD .x6 .x28 0)
+
+def positionState (state : MachineState) : MachineState :=
+  execInstrBr (positionBeforeStore state) (.SW .x7 .x6 4)
 
 theorem position_block (state : MachineState) (pc : state.pc = 0x10e8)
     (destination : state.getReg .x7 = 0x40000) :
@@ -157,18 +170,46 @@ theorem position_block (state : MachineState) (pc : state.pc = 0x10e8)
 
 theorem position_next_pc (state : MachineState) (pc : state.pc = 0x10e8) :
     (positionState state).pc = 0x10f8 := by
-  simp [positionState, execInstrBr, MachineState.setPC, pc]
+  simp [positionState, positionBeforeStore, execInstrBr, MachineState.setPC, pc]
 
 theorem position_hash_pointer (state : MachineState) :
     (positionState state).getReg .x7 = state.getReg .x7 := by
-  simp [positionState, execInstrBr, signExtend12,
+  simp [positionState, positionBeforeStore, execInstrBr, signExtend12,
     MachineState.getReg_setReg_ne]
 
-def treeState (state : MachineState) : MachineState :=
+theorem positionBeforeStore_memory (state : MachineState) (address : Word) :
+    (positionBeforeStore state).getMem address = state.getMem address := by
+  simp [positionBeforeStore, execInstrBr]
+
+theorem positionBeforeStore_pointer (state : MachineState) :
+    (positionBeforeStore state).getReg .x7 = state.getReg .x7 := by
+  simp [positionBeforeStore, execInstrBr, MachineState.getReg_setReg_ne]
+
+theorem positionBeforeStore_value (state : MachineState)
+    (zero : state.getMem (0x43010#64) = 0) :
+    (positionBeforeStore state).getReg .x6 = 0 := by
+  simp [positionBeforeStore, execInstrBr, signExtend12,
+    MachineState.getReg_setReg_eq]
+  exact zero
+
+theorem position_value (state : MachineState)
+    (destination : state.getReg .x7 = 0x40000)
+    (zero : state.getMem (0x43010#64) = 0) :
+    (positionState state).getWord32 0x40004 = 0 := by
+  simp only [positionState, execInstrBr, getWord32_setPC]
+  rw [positionBeforeStore_pointer, destination]
+  simp only [signExtend12]
+  convert getWord32_setWord32_same (positionBeforeStore state) 0x40004
+    (BitVec.setWidth 32 ((positionBeforeStore state).getReg .x6)) using 1 <;>
+    simp [positionBeforeStore_value state zero]
+
+def treeBeforeStore (state : MachineState) : MachineState :=
   let state := execInstrBr state (.LUI .x28 0x43)
   let state := execInstrBr state (.ADDI .x28 .x28 8)
-  let state := execInstrBr state (.LD .x6 .x28 0)
-  execInstrBr state (.SD .x7 .x6 8)
+  execInstrBr state (.LD .x6 .x28 0)
+
+def treeState (state : MachineState) : MachineState :=
+  execInstrBr (treeBeforeStore state) (.SD .x7 .x6 8)
 
 theorem tree_block (state : MachineState) (pc : state.pc = 0x10f8)
     (destination : state.getReg .x7 = 0x40000) :
@@ -202,18 +243,44 @@ theorem tree_block (state : MachineState) (pc : state.pc = 0x10f8)
 
 theorem tree_next_pc (state : MachineState) (pc : state.pc = 0x10f8) :
     (treeState state).pc = 0x1108 := by
-  simp [treeState, execInstrBr, MachineState.setPC, pc]
+  simp [treeState, treeBeforeStore, execInstrBr, MachineState.setPC, pc]
 
 theorem tree_hash_pointer (state : MachineState) :
     (treeState state).getReg .x7 = state.getReg .x7 := by
-  simp [treeState, execInstrBr, signExtend12,
+  simp [treeState, treeBeforeStore, execInstrBr, signExtend12,
     MachineState.getReg_setReg_ne]
 
-def indexState (state : MachineState) : MachineState :=
+theorem treeBeforeStore_memory (state : MachineState) (address : Word) :
+    (treeBeforeStore state).getMem address = state.getMem address := by
+  simp [treeBeforeStore, execInstrBr]
+
+theorem treeBeforeStore_pointer (state : MachineState) :
+    (treeBeforeStore state).getReg .x7 = state.getReg .x7 := by
+  simp [treeBeforeStore, execInstrBr, MachineState.getReg_setReg_ne]
+
+theorem treeBeforeStore_value (state : MachineState)
+    (zero : state.getMem (0x43008#64) = 0) :
+    (treeBeforeStore state).getReg .x6 = 0 := by
+  simp [treeBeforeStore, execInstrBr, signExtend12,
+    MachineState.getReg_setReg_eq]
+  exact zero
+
+theorem tree_value (state : MachineState)
+    (destination : state.getReg .x7 = 0x40000)
+    (zero : state.getMem (0x43008#64) = 0) :
+    (treeState state).getMem 0x40008 = 0 := by
+  simp only [treeState, execInstrBr, MachineState.getMem_setPC]
+  rw [treeBeforeStore_pointer, destination]
+  simp [signExtend12]
+  exact treeBeforeStore_value state zero
+
+def indexBeforeStore (state : MachineState) : MachineState :=
   let state := execInstrBr state (.LUI .x28 0x43)
   let state := execInstrBr state (.ADDI .x28 .x28 24)
-  let state := execInstrBr state (.LD .x6 .x28 0)
-  execInstrBr state (.SW .x7 .x6 16)
+  execInstrBr state (.LD .x6 .x28 0)
+
+def indexState (state : MachineState) : MachineState :=
+  execInstrBr (indexBeforeStore state) (.SW .x7 .x6 16)
 
 theorem index_block (state : MachineState) (pc : state.pc = 0x1108)
     (destination : state.getReg .x7 = 0x40000) :
@@ -247,12 +314,38 @@ theorem index_block (state : MachineState) (pc : state.pc = 0x1108)
 
 theorem index_next_pc (state : MachineState) (pc : state.pc = 0x1108) :
     (indexState state).pc = 0x1118 := by
-  simp [indexState, execInstrBr, MachineState.setPC, pc]
+  simp [indexState, indexBeforeStore, execInstrBr, MachineState.setPC, pc]
 
 theorem index_hash_pointer (state : MachineState) :
     (indexState state).getReg .x7 = state.getReg .x7 := by
-  simp [indexState, execInstrBr, signExtend12,
+  simp [indexState, indexBeforeStore, execInstrBr, signExtend12,
     MachineState.getReg_setReg_ne]
+
+theorem indexBeforeStore_memory (state : MachineState) (address : Word) :
+    (indexBeforeStore state).getMem address = state.getMem address := by
+  simp [indexBeforeStore, execInstrBr]
+
+theorem indexBeforeStore_pointer (state : MachineState) :
+    (indexBeforeStore state).getReg .x7 = state.getReg .x7 := by
+  simp [indexBeforeStore, execInstrBr, MachineState.getReg_setReg_ne]
+
+theorem indexBeforeStore_value (state : MachineState)
+    (zero : state.getMem (0x43018#64) = 0) :
+    (indexBeforeStore state).getReg .x6 = 0 := by
+  simp [indexBeforeStore, execInstrBr, signExtend12,
+    MachineState.getReg_setReg_eq]
+  exact zero
+
+theorem index_value (state : MachineState)
+    (destination : state.getReg .x7 = 0x40000)
+    (zero : state.getMem (0x43018#64) = 0) :
+    (indexState state).getWord32 0x40010 = 0 := by
+  simp only [indexState, execInstrBr, getWord32_setPC]
+  rw [indexBeforeStore_pointer, destination]
+  simp only [signExtend12]
+  convert getWord32_setWord32_same (indexBeforeStore state) 0x40010
+    (BitVec.setWidth 32 ((indexBeforeStore state).getReg .x6)) using 1 <;>
+    simp [indexBeforeStore_value state zero]
 
 def headerState (state : MachineState) : MachineState :=
   indexState (treeState (positionState (tagState state)))
