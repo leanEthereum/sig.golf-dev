@@ -3291,6 +3291,9 @@ theorem verify_code_length : verify.code.length = 6954 := by
   simp only [List.length_append, verifyChunk0_length, verifyChunk1_length, verifyChunk2_length, verifyChunk3_length, verifyChunk4_length, verifyChunk5_length, verifyChunk6_length, verifyChunk7_length, verifyChunk8_length, verifyChunk9_length, verifyChunk10_length, verifyChunk11_length, verifyChunk12_length, verifyChunk13_length, verifyChunk14_length, verifyChunk15_length, verifyChunk16_length, verifyChunk17_length, verifyChunk18_length, verifyChunk19_length, verifyChunk20_length, verifyChunk21_length, verifyChunk22_length, verifyChunk23_length, verifyChunk24_length, verifyChunk25_length, verifyChunk26_length, verifyChunk27_length, verifyChunk28_length, verifyChunk29_length, verifyChunk30_length, verifyChunk31_length, verifyChunk32_length, verifyChunk33_length, verifyChunk34_length, verifyChunk35_length, verifyChunk36_length, verifyChunk37_length, verifyChunk38_length, verifyChunk39_length, verifyChunk40_length, verifyChunk41_length, verifyChunk42_length, verifyChunk43_length, verifyChunk44_length, verifyChunk45_length, verifyChunk46_length, verifyChunk47_length, verifyChunk48_length, verifyChunk49_length, verifyChunk50_length, verifyChunk51_length, verifyChunk52_length, verifyChunk53_length, verifyChunk54_length, verifyChunk55_length, verifyChunk56_length, verifyChunk57_length, verifyChunk58_length, verifyChunk59_length, verifyChunk60_length, verifyChunk61_length, verifyChunk62_length, verifyChunk63_length, verifyChunk64_length, verifyChunk65_length, verifyChunk66_length, verifyChunk67_length, verifyChunk68_length, verifyChunk69_length, verifyChunk70_length, verifyChunk71_length, verifyChunk72_length]
 
 set_option maxHeartbeats 0 in
+theorem verify_entryWord : verify.code[0]? = some (0x0100006f : BitVec 32) := by decide
+
+set_option maxHeartbeats 0 in
 theorem verify_firstHashWord : verify.code[76]? = some (0x00000073 : BitVec 32) := by decide
 
 end SigGolfCandidate.SphincsImages

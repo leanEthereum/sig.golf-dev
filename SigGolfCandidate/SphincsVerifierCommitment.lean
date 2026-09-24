@@ -13,6 +13,20 @@ the scheme's 60-byte commitment input and charges one compression.
 namespace SigGolfCandidate.SphincsVerifierCommitment
 open SigGolf SigGolf.Riscv RiscvZkvm.Rv64 SphincsSecurity
 open SigGolfCandidate.SphincsBridge
+deriving instance DecidableEq for SigGolf.Riscv.Instruction
+
+theorem entry_fetch (state : MachineState) (pc : state.pc = 0x1000) :
+    fetch SphincsImages.verify state = some (.base (.JAL .x0 16)) := by
+  simp [fetch, pc, SphincsImages.verify_entryWord, decodeInstruction]
+  decide
+
+theorem entry_block (state : MachineState) (pc : state.pc = 0x1000) :
+    OrdinarySteps SphincsImages.verify state 1 (execInstrBr state (.JAL .x0 16)) := by
+  exact OrdinarySteps.step state _ _ _ 0 (entry_fetch state pc) rfl (OrdinarySteps.refl _)
+
+theorem entry_next_pc (state : MachineState) (pc : state.pc = 0x1000) :
+    (execInstrBr state (.JAL .x0 16)).pc = 0x1010 := by
+  simp [execInstrBr, pc, signExtend21, MachineState.setPC]
 
 theorem hash_site (state : MachineState) (pc : state.pc = 0x1130) :
     fetch SphincsImages.verify state = some (.base .ECALL) := by

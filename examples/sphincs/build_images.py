@@ -541,6 +541,9 @@ if __name__ == '__main__':
                   ', '.join(name + '_length' for name in names) + ']', '']
     lines += [
         'set_option maxHeartbeats 0 in',
+        'theorem verify_entryWord : verify.code[0]? = some (0x0100006f : BitVec 32) := by decide',
+        '',
+        'set_option maxHeartbeats 0 in',
         'theorem verify_firstHashWord : verify.code[76]? = some (0x00000073 : BitVec 32) := by decide',
         '',
         'end SigGolfCandidate.SphincsImages',
