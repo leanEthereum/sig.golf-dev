@@ -131,4 +131,33 @@ theorem encodeSignature_length (publicKey : SphincsSecurity.PublicKey)
   rw [concatFields_length _ _ _ (ftsOpening_length signature)]
   simp [bytesLE, signatureBytes, internalPublicKeyBytes, digestBytes]
 
+/-- A valid target-sum code word always leaves exactly 170 chain steps for the verifier. -/
+def recoverySteps (encoding : Encoding) : Nat :=
+  Finset.univ.sum (fun idx : ChainIndex => 7 - (encoding idx).val)
+
+theorem recoverySteps_eq (encoding : Encoding) (valid : TargetSum.Valid encoding) :
+    recoverySteps encoding = 170 := by
+  have hsum : recoverySteps encoding + TargetSum.sum encoding =
+      Finset.univ.sum (fun _ : ChainIndex => (7 : Nat)) := by
+    rw [recoverySteps, TargetSum.sum, ← Finset.sum_add_distrib]
+    apply Finset.sum_congr rfl
+    intro idx _
+    have bound := (encoding idx).isLt
+    simp only [chainLength, winternitzBits] at bound
+    omega
+  simp only [TargetSum.Valid, targetSum] at valid
+  simp [numChains] at hsum
+  omega
+
+/-- HASH compression charges along any accepting verification path, before ordinary instructions. -/
+def acceptingHashCompressions : Nat :=
+  1 + -- 16-byte public-key commitment
+  2 + -- message digest
+  (ftsTrees - 1) * (1 + ftsTreeHeight * 2) + -- one leaf and eight two-block nodes per tree
+  9 + -- hash of 24 FORS roots
+  numLayers * (1 + 17 + 170) + -- encoding, WOTS leaf, remaining chain steps
+  totalHeight * 2 -- 34 two-block XMSS nodes
+
+theorem acceptingHashCompressions_eq : acceptingHashCompressions = 1616 := by decide
+
 end SigGolfCandidate.SphincsWire
