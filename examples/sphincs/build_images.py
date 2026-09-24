@@ -539,6 +539,18 @@ if __name__ == '__main__':
                   '  change (' + ' ++ '.join(names) + f').length = {len(words)}',
                   '  simp only [' + ('List.length_append, ' if len(names) > 1 else '') +
                   ', '.join(name + '_length' for name in names) + ']', '']
+    prefix = images['verify'][:77]
+    lines += ['def verifyPrefix : List (BitVec 32) := [']
+    lines += ['  ' + ', '.join(f'0x{word:08x}' for word in prefix[i:i + 8]) +
+              (',' if i + 8 < len(prefix) else ']') for i in range(0, len(prefix), 8)]
+    lines += [
+        '',
+        'theorem verifyPrefix_length : verifyPrefix.length = 77 := by rfl',
+        '',
+        'set_option maxHeartbeats 0 in',
+        'theorem verifyPrefix_eq : verify.code.take 77 = verifyPrefix := by decide',
+        '',
+    ]
     lines += [
         'set_option maxHeartbeats 0 in',
         'theorem verify_entryWord : verify.code[0]? = some (0x0100006f : BitVec 32) := by decide',

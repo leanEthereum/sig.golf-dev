@@ -3290,6 +3290,23 @@ theorem verify_code_length : verify.code.length = 6954 := by
   change (verifyChunk0 ++ verifyChunk1 ++ verifyChunk2 ++ verifyChunk3 ++ verifyChunk4 ++ verifyChunk5 ++ verifyChunk6 ++ verifyChunk7 ++ verifyChunk8 ++ verifyChunk9 ++ verifyChunk10 ++ verifyChunk11 ++ verifyChunk12 ++ verifyChunk13 ++ verifyChunk14 ++ verifyChunk15 ++ verifyChunk16 ++ verifyChunk17 ++ verifyChunk18 ++ verifyChunk19 ++ verifyChunk20 ++ verifyChunk21 ++ verifyChunk22 ++ verifyChunk23 ++ verifyChunk24 ++ verifyChunk25 ++ verifyChunk26 ++ verifyChunk27 ++ verifyChunk28 ++ verifyChunk29 ++ verifyChunk30 ++ verifyChunk31 ++ verifyChunk32 ++ verifyChunk33 ++ verifyChunk34 ++ verifyChunk35 ++ verifyChunk36 ++ verifyChunk37 ++ verifyChunk38 ++ verifyChunk39 ++ verifyChunk40 ++ verifyChunk41 ++ verifyChunk42 ++ verifyChunk43 ++ verifyChunk44 ++ verifyChunk45 ++ verifyChunk46 ++ verifyChunk47 ++ verifyChunk48 ++ verifyChunk49 ++ verifyChunk50 ++ verifyChunk51 ++ verifyChunk52 ++ verifyChunk53 ++ verifyChunk54 ++ verifyChunk55 ++ verifyChunk56 ++ verifyChunk57 ++ verifyChunk58 ++ verifyChunk59 ++ verifyChunk60 ++ verifyChunk61 ++ verifyChunk62 ++ verifyChunk63 ++ verifyChunk64 ++ verifyChunk65 ++ verifyChunk66 ++ verifyChunk67 ++ verifyChunk68 ++ verifyChunk69 ++ verifyChunk70 ++ verifyChunk71 ++ verifyChunk72).length = 6954
   simp only [List.length_append, verifyChunk0_length, verifyChunk1_length, verifyChunk2_length, verifyChunk3_length, verifyChunk4_length, verifyChunk5_length, verifyChunk6_length, verifyChunk7_length, verifyChunk8_length, verifyChunk9_length, verifyChunk10_length, verifyChunk11_length, verifyChunk12_length, verifyChunk13_length, verifyChunk14_length, verifyChunk15_length, verifyChunk16_length, verifyChunk17_length, verifyChunk18_length, verifyChunk19_length, verifyChunk20_length, verifyChunk21_length, verifyChunk22_length, verifyChunk23_length, verifyChunk24_length, verifyChunk25_length, verifyChunk26_length, verifyChunk27_length, verifyChunk28_length, verifyChunk29_length, verifyChunk30_length, verifyChunk31_length, verifyChunk32_length, verifyChunk33_length, verifyChunk34_length, verifyChunk35_length, verifyChunk36_length, verifyChunk37_length, verifyChunk38_length, verifyChunk39_length, verifyChunk40_length, verifyChunk41_length, verifyChunk42_length, verifyChunk43_length, verifyChunk44_length, verifyChunk45_length, verifyChunk46_length, verifyChunk47_length, verifyChunk48_length, verifyChunk49_length, verifyChunk50_length, verifyChunk51_length, verifyChunk52_length, verifyChunk53_length, verifyChunk54_length, verifyChunk55_length, verifyChunk56_length, verifyChunk57_length, verifyChunk58_length, verifyChunk59_length, verifyChunk60_length, verifyChunk61_length, verifyChunk62_length, verifyChunk63_length, verifyChunk64_length, verifyChunk65_length, verifyChunk66_length, verifyChunk67_length, verifyChunk68_length, verifyChunk69_length, verifyChunk70_length, verifyChunk71_length, verifyChunk72_length]
 
+def verifyPrefix : List (BitVec 32) := [
+  0x0100006f, 0x00000293, 0x00000513, 0x00000073, 0x00000313, 0x00043e37, 0x000e0e13, 0x006e3023,
+  0x00000313, 0x00043e37, 0x008e0e13, 0x006e3023, 0x00000313, 0x00043e37, 0x010e0e13, 0x006e3023,
+  0x00000313, 0x00043e37, 0x018e0e13, 0x006e3023, 0x00023337, 0xca030313, 0x000403b7, 0x01438393,
+  0x00036683, 0x00d3a023, 0x00436683, 0x00d3a223, 0x00836683, 0x00d3a423, 0x00c36683, 0x00d3a623,
+  0x01036683, 0x00d3a823, 0x00023337, 0xcb430313, 0x000403b7, 0x02838393, 0x00036683, 0x00d3a023,
+  0x00436683, 0x00d3a223, 0x00836683, 0x00d3a423, 0x00c36683, 0x00d3a623, 0x01036683, 0x00d3a823,
+  0x00001337, 0xd0130313, 0x00043e37, 0x000e0e13, 0x000e3383, 0x01039393, 0x00730333, 0x000403b7,
+  0x00038393, 0x0063a023, 0x00043e37, 0x010e0e13, 0x000e3303, 0x0063a223, 0x00043e37, 0x008e0e13,
+  0x000e3303, 0x0063b423, 0x00043e37, 0x018e0e13, 0x000e3303, 0x0063a823, 0x00040537, 0x00050513,
+  0x1e000593, 0x00042637, 0x00060613, 0x00100293, 0x00000073]
+
+theorem verifyPrefix_length : verifyPrefix.length = 77 := by rfl
+
+set_option maxHeartbeats 0 in
+theorem verifyPrefix_eq : verify.code.take 77 = verifyPrefix := by decide
+
 set_option maxHeartbeats 0 in
 theorem verify_entryWord : verify.code[0]? = some (0x0100006f : BitVec 32) := by decide
 
