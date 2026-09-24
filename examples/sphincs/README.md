@@ -16,7 +16,7 @@ This is not a beta submission yet. The abstract 24-tree scheme has a Lean securi
 
 `SigGolfCandidate/SphincsVerifierPrefix.lean` exposes a checked 77-word prefix of the exact image. `SigGolfCandidate/SphincsVerifierSlots.lean` proves the entry jump and the next 16 instructions execute, zeroing all four commitment-header scratch words. This is the start of the missing straight-line refinement, not a proof of the entire prefix.
 
-`SigGolfCandidate/SphincsVerifierCopy.lean` extends the exact execution trace through instruction 31: it sets the witness and hash-buffer pointers, then executes all five load/store pairs for the first 20-byte commitment field. Proving that the destination bytes have the required values, and following the remainder of the verifier, are still open.
+`SigGolfCandidate/SphincsVerifierCopy.lean` extends the exact execution trace through instruction 31: it sets the witness and hash-buffer pointers, then executes all five load/store pairs for the first 20-byte commitment field. `SigGolfCandidate/SphincsVerifierCopyMemory.lean` proves that the five resulting 32-bit destination words equal the corresponding witness words, with only Lean's standard axioms. Connecting those words to the typed commitment input and following the remainder of the verifier are still open.
 
 The verifier uses 1,616 HASH compressions on an accepting run. Differential tests observe `159,530 + r` executed instructions and `171,173 + r` cycles, where `r` is the number of right turns across 192 FORS and 34 hypertree nodes. Thus the candidate cycle bound is 171,399 and its proposed score is 1,940,922,276. These figures still need a proof about the exact image; tests alone do not certify them.
 
