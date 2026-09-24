@@ -532,9 +532,13 @@ if __name__ == '__main__':
             lines += ['  ' + ', '.join(f'0x{word:08x}' for word in chunk[i:i + 8]) +
                       (',' if i + 8 < len(chunk) else ']')
                       for i in range(0, len(chunk), 8)]
-            lines += ['']
+            lines += ['', f'private theorem {name}_length : {name}.length = {len(chunk)} := by rfl', '']
         lines += [f'def {phase} : Riscv.Image where',
                   '  code := ' + ' ++\n    '.join(names), '  data := []', '']
+        lines += [f'theorem {phase}_code_length : {phase}.code.length = {len(words)} := by',
+                  '  change (' + ' ++ '.join(names) + f').length = {len(words)}',
+                  '  simp only [' + ('List.length_append, ' if len(names) > 1 else '') +
+                  ', '.join(name + '_length' for name in names) + ']', '']
     lines += ['end SigGolfCandidate.SphincsImages', '']
     target.write_text('\n'.join(lines))
     for phase, words in images.items():
