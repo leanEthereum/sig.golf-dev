@@ -539,7 +539,13 @@ if __name__ == '__main__':
                   '  change (' + ' ++ '.join(names) + f').length = {len(words)}',
                   '  simp only [' + ('List.length_append, ' if len(names) > 1 else '') +
                   ', '.join(name + '_length' for name in names) + ']', '']
-    lines += ['end SigGolfCandidate.SphincsImages', '']
+    lines += [
+        'set_option maxHeartbeats 0 in',
+        'theorem verify_firstHashWord : verify.code[76]? = some (0x00000073 : BitVec 32) := by decide',
+        '',
+        'end SigGolfCandidate.SphincsImages',
+        '',
+    ]
     target.write_text('\n'.join(lines))
     for phase, words in images.items():
         print(phase + ':', len(words), 'instructions,', 4 * len(words), 'image bytes')
