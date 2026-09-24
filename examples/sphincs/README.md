@@ -8,6 +8,8 @@ This is not a beta submission yet. The abstract 24-tree scheme has a Lean securi
 
 `SigGolfCandidate/SphincsSecurity/Proof/Adversary/Security128.lean` strengthens the deterministic-seed scheme's internal forgery bound to Q / 2^128 for Q ≤ 2^127. This leaves a separate Q / 2^128 allowance for the 16-byte public-key commitment. It does not yet establish the submitted bytecode's security claim.
 
+`SigGolfCandidate/SphincsCommitment.lean` proves that the commitment input uniquely encodes the internal public key and cannot coincide with any key-derivation, nonce-generation, or verification hash input. It also proves that a fresh 256-bit oracle response matches a fixed 16-byte commitment with probability 2^-128. An adaptive collision bound and the game reduction to the actual four bytecode programs remain open.
+
 The verifier uses 1,616 HASH compressions on an accepting run. Differential tests observe `159,530 + r` executed instructions and `171,173 + r` cycles, where `r` is the number of right turns across 192 FORS and 34 hypertree nodes. Thus the candidate cycle bound is 171,399 and its proposed score is 1,940,922,276. These figures still need a proof about the exact image; tests alone do not certify them.
 
 Remaining work is a formal correspondence for keygen, sign, and verify with the abstract scheme, their resource and termination proofs, and a security reduction for the 16-byte public-key commitment and attacker-controlled cache. None of this branch should be pushed as a normal submission until the complete `SigGolf.Certificate` passes.
