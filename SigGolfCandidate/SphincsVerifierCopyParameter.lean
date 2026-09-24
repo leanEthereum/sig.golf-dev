@@ -163,6 +163,20 @@ theorem setupAndBoth_block (state : MachineState) (pc : state.pc = 0x1000) :
   simpa [setupAndBothState, afterRoot, afterPointers] using
     (first.append pointers).append copied
 
+theorem setupAndBoth_pc (state : MachineState) (pc : state.pc = 0x1000) :
+    (setupAndBothState state).pc = 0x10c0 := by
+  have jumpPc := SphincsVerifierCommitment.entry_next_pc state pc
+  have headerPc := SphincsVerifierSlots.header_next_pc
+    (execInstrBr state (.JAL .x0 16)) jumpPc
+  have pointerPc := addressSetup_pc
+    (SphincsVerifierSlots.headerState (execInstrBr state (.JAL .x0 16))) headerPc
+  have rootPc := copyRoot_pc
+    (addressSetupState (SphincsVerifierSlots.headerState (execInstrBr state (.JAL .x0 16))))
+    pointerPc
+  have parameterPc := parameterPointers_pc (setupAndRootState state) rootPc
+  simpa [setupAndBothState] using
+    copyParameter_pc (parameterPointers (setupAndRootState state)) parameterPc
+
 /-- info: 'SigGolfCandidate.SphincsVerifierCopyParameter.setupAndBoth_block' depends on axioms: [propext,
  Classical.choice,
  Quot.sound] -/

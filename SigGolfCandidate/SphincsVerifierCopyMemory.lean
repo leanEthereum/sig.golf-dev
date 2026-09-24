@@ -104,6 +104,54 @@ theorem copyWord_source (written read : Fin 5) (state : MachineState)
       signExtend12, MachineState.getReg_setReg_ne] <;>
     (rw [getWord32_setWord32_other _ _ _ _ (by decide)]; simp)
 
+/-- A copy step changes only the doubleword containing its destination lane. -/
+theorem copyWord_mem_frame (offset : Fin 5) (state : MachineState)
+    (address : Word)
+    (outside : address ≠ alignToDword
+      (state.getReg .x7 + signExtend12 (4#12 * BitVec.ofNat 12 offset.val))) :
+    (copyWordState offset state).getMem address = state.getMem address := by
+  simp [copyWordState, execInstrBr, MachineState.setWord32,
+    MachineState.getMem_setMem_ne, MachineState.getMem_setReg,
+    MachineState.getReg_setReg_ne, outside]
+
+theorem copyRoot_mem_frame (state : MachineState) (address : Word)
+    (outside : ∀ offset : Fin 5, address ≠ alignToDword
+      (state.getReg .x7 + signExtend12 (4#12 * BitVec.ofNat 12 offset.val))) :
+    (copyRootState state).getMem address = state.getMem address := by
+  let s1 := copyWordState 0 state
+  let s2 := copyWordState 1 s1
+  let s3 := copyWordState 2 s2
+  let s4 := copyWordState 3 s3
+  have d1 : s1.getReg .x7 = state.getReg .x7 := (copyWord_pointers 0 state).2
+  have d2 : s2.getReg .x7 = state.getReg .x7 :=
+    (copyWord_pointers 1 s1).2.trans d1
+  have d3 : s3.getReg .x7 = state.getReg .x7 :=
+    (copyWord_pointers 2 s2).2.trans d2
+  have d4 : s4.getReg .x7 = state.getReg .x7 :=
+    (copyWord_pointers 3 s3).2.trans d3
+  have o1 : address ≠ alignToDword
+      (s1.getReg .x7 + signExtend12 (4#12 * BitVec.ofNat 12 (1 : Fin 5).val)) := by
+    rw [d1]
+    exact outside 1
+  have o2 : address ≠ alignToDword
+      (s2.getReg .x7 + signExtend12 (4#12 * BitVec.ofNat 12 (2 : Fin 5).val)) := by
+    rw [d2]
+    exact outside 2
+  have o3 : address ≠ alignToDword
+      (s3.getReg .x7 + signExtend12 (4#12 * BitVec.ofNat 12 (3 : Fin 5).val)) := by
+    rw [d3]
+    exact outside 3
+  have o4 : address ≠ alignToDword
+      (s4.getReg .x7 + signExtend12 (4#12 * BitVec.ofNat 12 (4 : Fin 5).val)) := by
+    rw [d4]
+    exact outside 4
+  change (copyWordState 4 s4).getMem address = state.getMem address
+  rw [copyWord_mem_frame 4 s4 address o4,
+    copyWord_mem_frame 3 s3 address o3,
+    copyWord_mem_frame 2 s2 address o2,
+    copyWord_mem_frame 1 s1 address o1,
+    copyWord_mem_frame 0 state address (outside 0)]
+
 private def CopyInvariant (original : MachineState) (count : Nat)
     (state : MachineState) : Prop :=
   state.getReg .x6 = 0x22ca0 ∧
