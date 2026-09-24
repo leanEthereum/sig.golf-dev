@@ -15,6 +15,7 @@ open SigGolfCandidate.SphincsVerifierCopyParameter
 open SigGolfCandidate.SphincsVerifierCopy
 open SigGolfCandidate.SphincsVerifierCopyMemory
 open SigGolfCandidate.SphincsVerifierCopyParameterMemory
+open SigGolfCandidate.SphincsBridge
 
 private theorem extractByte_of_extractWord32 (word : Word) (lane : Fin 2)
     (byte : Fin 4) :
@@ -267,6 +268,245 @@ theorem firstHash_parameter_byte (state : MachineState) (index : Fin 5)
         (BitVec.ofNat 64 (0x22cb4 + 4 * index.val + byte.val)) := by
   rw [parameterDestinationByte, parameterSourceByte, firstHash_parameter_word]
 
+private theorem headerWordByte (state : MachineState) (base : Nat)
+    (supported : base = 0x40000 ∨ base = 0x40004 ∨ base = 0x40010)
+    (byte : Fin 4) :
+    state.getByte (BitVec.ofNat 64 (base + byte.val)) =
+      (state.getWord32 (BitVec.ofNat 64 base)).extractLsb'
+        (8 * byte.val) 8 := by
+  have split := extractByte_from_word32
+    (state.getMem (alignToDword (BitVec.ofNat 64 (base + byte.val))))
+    ⟨(base + byte.val) % 8, Nat.mod_lt _ (by decide)⟩
+  rcases supported with h | h | h <;> subst base <;> fin_cases byte <;>
+    simpa [MachineState.getByte, MachineState.getWord32,
+      alignToDword, byteOffset] using split
+
+theorem firstHash_tag_byte (state : MachineState) (byte : Fin 4) :
+    (firstHashState state).getByte
+      (BitVec.ofNat 64 (0x40000 + byte.val)) =
+      (0xd01#32).extractLsb' (8 * byte.val) 8 := by
+  rw [headerWordByte _ 0x40000 (Or.inl rfl) byte]
+  have address : BitVec.ofNat 64 0x40000 = (0x40000 : Word) := by decide
+  rw [address, firstHash_tag]
+  congr 1
+
+theorem firstHash_position_byte (state : MachineState) (byte : Fin 4) :
+    (firstHashState state).getByte
+      (BitVec.ofNat 64 (0x40004 + byte.val)) = 0 := by
+  rw [headerWordByte _ 0x40004 (Or.inr (Or.inl rfl)) byte]
+  have address : BitVec.ofNat 64 0x40004 = (0x40004 : Word) := by decide
+  rw [address, firstHash_position]
+  simp
+
+theorem firstHash_tree_byte (state : MachineState) (byte : Fin 8) :
+    (firstHashState state).getByte
+      (BitVec.ofNat 64 (0x40008 + byte.val)) = 0 := by
+  have tree : (firstHashState state).getMem (262152#64) = 0 := by
+    simpa using firstHash_tree state
+  fin_cases byte <;>
+    simp [MachineState.getByte, alignToDword, byteOffset, tree, extractByte]
+
+theorem firstHash_index_byte (state : MachineState) (byte : Fin 4) :
+    (firstHashState state).getByte
+      (BitVec.ofNat 64 (0x40010 + byte.val)) = 0 := by
+  rw [headerWordByte _ 0x40010 (Or.inr (Or.inr rfl)) byte]
+  have address : BitVec.ofNat 64 0x40010 = (0x40010 : Word) := by decide
+  rw [address, firstHash_index]
+  simp
+
+theorem firstHash_header_byte (state : MachineState) (index : Fin 20) :
+    (firstHashState state).getByte
+      (BitVec.ofNat 64 (0x40000 + index.val)) =
+      ((SphincsSecurity.fieldBytes
+        (SphincsSecurity.tweakFields 13 0 0 0 0)).map UInt8.toBitVec)[index.val]'(by
+          simp [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+            SphincsSecurity.bytesLE]) := by
+  fin_cases index <;>
+    first
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_tag_byte state 0
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_tag_byte state 1
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_tag_byte state 2
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_tag_byte state 3
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_position_byte state 0
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_position_byte state 1
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_position_byte state 2
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_position_byte state 3
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_tree_byte state 0
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_tree_byte state 1
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_tree_byte state 2
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_tree_byte state 3
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_tree_byte state 4
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_tree_byte state 5
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_tree_byte state 6
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_tree_byte state 7
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_index_byte state 0
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_index_byte state 1
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_index_byte state 2
+    | simpa [SphincsSecurity.fieldBytes, SphincsSecurity.tweakFields,
+        SphincsSecurity.protocolDomainSep, SphincsSecurity.bytesLE] using
+        firstHash_index_byte state 3
+
+theorem firstHash_root_bytes (state : MachineState) (i : Nat) (hi : i < 20) :
+    (firstHashState state).getByte (BitVec.ofNat 64 (0x40014 + i)) =
+      state.getByte (BitVec.ofNat 64 (0x22ca0 + i)) := by
+  let word : Fin 5 := ⟨i / 4, by omega⟩
+  let byte : Fin 4 := ⟨i % 4, by omega⟩
+  have h := firstHash_root_byte state word byte
+  have split : 4 * word.val + byte.val = i := by
+    dsimp [word, byte]
+    omega
+  simpa [split, Nat.add_assoc] using h
+
+theorem firstHash_parameter_bytes (state : MachineState) (i : Nat)
+    (hi : i < 20) :
+    (firstHashState state).getByte (BitVec.ofNat 64 (0x40028 + i)) =
+      state.getByte (BitVec.ofNat 64 (0x22cb4 + i)) := by
+  let word : Fin 5 := ⟨i / 4, by omega⟩
+  let byte : Fin 4 := ⟨i % 4, by omega⟩
+  have h := firstHash_parameter_byte state word byte
+  have split : 4 * word.val + byte.val = i := by
+    dsimp [word, byte]
+    omega
+  simpa [split, Nat.add_assoc] using h
+
+private theorem commitment_root_byte (pk : SphincsSecurity.PublicKey)
+    (i : Nat) (hi : i < 20) :
+    ((SphincsWire.commitmentInput pk).map UInt8.toBitVec)[20 + i]'(by
+      simpa [SphincsWire.commitmentInput_length] using (show 20 + i < 60 by omega)) =
+      pk.root.extractLsb' (8 * i) 8 := by
+  simp only [SphincsWire.commitmentInput, List.map_append]
+  rw [List.getElem_append_left (by
+    simp [SphincsSecurity.fieldBytes, SphincsSecurity.bytesLE,
+      SphincsWire.digestBytes]
+    omega)]
+  rw [List.getElem_append_right (by
+    simp [SphincsSecurity.fieldBytes, SphincsSecurity.bytesLE])]
+  simp only [List.getElem_map, SphincsSecurity.bytesLE,
+    List.getElem_ofFn, UInt8.toBitVec_ofBitVec]
+  simp [SphincsSecurity.fieldBytes, SphincsSecurity.bytesLE,
+    SphincsWire.digestBytes]
+  rfl
+
+private theorem commitment_header_byte (pk : SphincsSecurity.PublicKey)
+    (i : Nat) (hi : i < 20) :
+    ((SphincsWire.commitmentInput pk).map UInt8.toBitVec)[i]'(by
+      simpa [SphincsWire.commitmentInput_length] using (show i < 60 by omega)) =
+      ((SphincsSecurity.fieldBytes
+        (SphincsSecurity.tweakFields 13 0 0 0 0)).map UInt8.toBitVec)[i]'(by
+          simpa [SphincsSecurity.fieldBytes, SphincsSecurity.bytesLE] using hi) := by
+  simp only [SphincsWire.commitmentInput, List.map_append]
+  rw [List.getElem_append_left (by
+    simp [SphincsSecurity.fieldBytes, SphincsSecurity.bytesLE]
+    omega)]
+  rw [List.getElem_append_left (by
+    simpa [SphincsSecurity.fieldBytes, SphincsSecurity.bytesLE] using hi)]
+
+private theorem commitment_parameter_byte (pk : SphincsSecurity.PublicKey)
+    (i : Nat) (hi : i < 20) :
+    ((SphincsWire.commitmentInput pk).map UInt8.toBitVec)[40 + i]'(by
+      simpa [SphincsWire.commitmentInput_length] using (show 40 + i < 60 by omega)) =
+      pk.parameter.extractLsb' (8 * i) 8 := by
+  simp only [SphincsWire.commitmentInput, List.map_append]
+  rw [List.getElem_append_right (by
+    simp [SphincsSecurity.fieldBytes, SphincsSecurity.bytesLE,
+      SphincsWire.digestBytes])]
+  simp only [List.getElem_map, SphincsSecurity.bytesLE,
+    List.getElem_ofFn, UInt8.toBitVec_ofBitVec]
+  simp [SphincsSecurity.fieldBytes, SphincsSecurity.bytesLE,
+    SphincsWire.digestBytes]
+  rfl
+
+/-- The first forty witness bytes encode the internal public key. -/
+structure WitnessPrefix (state : MachineState)
+    (pk : SphincsSecurity.PublicKey) : Prop where
+  root : ∀ i, (hi : i < 20) →
+    state.getByte (BitVec.ofNat 64 (0x22ca0 + i)) =
+      pk.root.extractLsb' (8 * i) 8
+  parameter : ∀ i, (hi : i < 20) →
+    state.getByte (BitVec.ofNat 64 (0x22cb4 + i)) =
+      pk.parameter.extractLsb' (8 * i) 8
+
+theorem firstHash_ready (state : MachineState) (pk : SphincsSecurity.PublicKey)
+    (hprefix : WitnessPrefix state pk) :
+    CommitmentReady (firstHashState state) pk := by
+  have registers := firstHash_registers state
+  refine ⟨registers.1, registers.2.1, registers.2.2.1,
+    registers.2.2.2, ?_⟩
+  intro i hi
+  have hi60 : i < 60 := by
+    simpa [SphincsWire.commitmentInput_length] using hi
+  by_cases header : i < 20
+  · have actual := firstHash_header_byte state ⟨i, header⟩
+    have expected := commitment_header_byte pk i header
+    exact actual.trans expected.symm
+  by_cases root : i < 40
+  · let j := i - 20
+    have hj : j < 20 := by dsimp [j]; omega
+    have index : i = 20 + j := by dsimp [j]; omega
+    have address : 0x40000 + i = 0x40014 + j := by omega
+    calc
+      (firstHashState state).getByte (BitVec.ofNat 64 (0x40000 + i))
+          = (firstHashState state).getByte
+              (BitVec.ofNat 64 (0x40014 + j)) := by rw [address]
+      _ = state.getByte (BitVec.ofNat 64 (0x22ca0 + j)) :=
+        firstHash_root_bytes state j hj
+      _ = pk.root.extractLsb' (8 * j) 8 := hprefix.root j hj
+      _ = ((SphincsWire.commitmentInput pk).map UInt8.toBitVec)[i]'(by
+            simpa [SphincsWire.commitmentInput_length] using hi60) := by
+        simpa [index] using (commitment_root_byte pk j hj).symm
+  · let j := i - 40
+    have hj : j < 20 := by dsimp [j]; omega
+    have index : i = 40 + j := by dsimp [j]; omega
+    have address : 0x40000 + i = 0x40028 + j := by omega
+    calc
+      (firstHashState state).getByte (BitVec.ofNat 64 (0x40000 + i))
+          = (firstHashState state).getByte
+              (BitVec.ofNat 64 (0x40028 + j)) := by rw [address]
+      _ = state.getByte (BitVec.ofNat 64 (0x22cb4 + j)) :=
+        firstHash_parameter_bytes state j hj
+      _ = pk.parameter.extractLsb' (8 * j) 8 := hprefix.parameter j hj
+      _ = ((SphincsWire.commitmentInput pk).map UInt8.toBitVec)[i]'(by
+            simpa [SphincsWire.commitmentInput_length] using hi60) := by
+        simpa [index] using (commitment_parameter_byte pk j hj).symm
+
 /-- info: 'SigGolfCandidate.SphincsVerifierHashBytes.firstHash_root_byte' depends on axioms: [propext,
  Classical.choice,
  Quot.sound] -/
@@ -278,5 +518,15 @@ theorem firstHash_parameter_byte (state : MachineState) (index : Fin 5)
  Quot.sound] -/
 #guard_msgs in
 #print axioms firstHash_parameter_byte
+
+/-- info: 'SigGolfCandidate.SphincsVerifierHashBytes.firstHash_header_byte' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound] -/
+#guard_msgs in
+#print axioms firstHash_header_byte
+
+/-- info: 'SigGolfCandidate.SphincsVerifierHashBytes.firstHash_ready' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms firstHash_ready
 
 end SigGolfCandidate.SphincsVerifierHashBytes
