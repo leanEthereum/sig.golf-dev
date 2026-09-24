@@ -50,8 +50,35 @@ theorem nodeOffset_end_le_usedBytes (level node : Nat)
 theorem rootOffset_eq : rowBase maxLayerHeight = 81920 := by decide
 theorem rootEndsAtUsedBytes : rowBase maxLayerHeight + digestBytes = usedBytes := by decide
 
+/-- The sibling of the leaf's ancestor at a given authentication-path level. -/
+def siblingIndex (leaf level : Nat) : Nat :=
+  let ancestor := leaf / 2 ^ level
+  if ancestor % 2 = 0 then ancestor + 1 else ancestor - 1
+
+def siblingOffset (leaf level : Nat) : Nat := nodeOffset level (siblingIndex leaf level)
+
+/-- Every top-tree authentication sibling lies entirely in the used cache prefix. -/
+theorem siblingOffset_end_le_usedBytes (leaf level : Nat)
+    (hleaf : leaf < topLeaves) (hlevel : level < maxLayerHeight) :
+    siblingOffset leaf level + digestBytes ≤ usedBytes := by
+  have hlevel' : level < 11 := by simpa [maxLayerHeight] using hlevel
+  have hleaf' : leaf < 2048 := by simpa [topLeaves, maxLayerHeight] using hleaf
+  have hsibling : siblingIndex leaf level < 2 ^ (maxLayerHeight - level) := by
+    interval_cases h : level <;>
+      simp only [siblingIndex] <;>
+      split_ifs <;>
+      norm_num [maxLayerHeight] at * <;> omega
+  exact nodeOffset_end_le_usedBytes level (siblingIndex leaf level)
+    (Nat.le_of_lt hlevel) hsibling
+
 /-- info: 'SigGolfCandidate.SphincsCache.nodeOffset_end_le_usedBytes' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms nodeOffset_end_le_usedBytes
+
+/-- info: 'SigGolfCandidate.SphincsCache.siblingOffset_end_le_usedBytes' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound] -/
+#guard_msgs in
+#print axioms siblingOffset_end_le_usedBytes
 
 end SigGolfCandidate.SphincsCache
