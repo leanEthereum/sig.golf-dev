@@ -63,6 +63,31 @@ theorem failure_le (message : Message) :
   rw [probEvent_map]
   exact (probEvent_honest_false_le seed message).trans (probEvent_signedWithKeys_none seed message)
 
+/-- The same failure bound holds for each fixed master seed. -/
+theorem failure_for_seed_le (seed : MasterSeed) (message : Message) :
+    Pr[fun r => r.1 = false |
+        (simulateQ (randomOracle : QueryImpl HashSpec _) (honest seed message)).run ∅]
+      ≤ digestFactor ^ digestAttemptLimit + 5 * encodingBound :=
+  (probEvent_honest_false_le seed message).trans (probEvent_signedWithKeys_none seed message)
+
+/-- The union-bound input is uniform in the secret seed. -/
+theorem complete_each_seed (seed : MasterSeed) :
+    ∑' message : Message,
+      Pr[fun r => r.1 = false |
+        (simulateQ (randomOracle : QueryImpl HashSpec _) (honest seed message)).run ∅]
+      ≤ ((2 ^ 256 : Nat) : ℝ≥0∞)⁻¹ := by
+  calc
+    _ ≤ ∑' _message : Message,
+        ((2⁻¹ : ℝ≥0∞) ^ (2 ^ 11) + 5 * (2⁻¹ : ℝ≥0∞) ^ (2 ^ 10)) := by
+          refine ENNReal.tsum_le_tsum fun message => ?_
+          exact (failure_for_seed_le seed message).trans
+            (add_le_add digestFactor_pow_le (mul_le_mul_right encoding_pow_le _))
+    _ = (2 : ℝ≥0∞) ^ 256 *
+        ((2⁻¹ : ℝ≥0∞) ^ (2 ^ 11) + 5 * (2⁻¹ : ℝ≥0∞) ^ (2 ^ 10)) := by
+          rw [tsum_fintype, Finset.sum_const, nsmul_eq_mul, Finset.card_univ,
+            show Fintype.card Message = 2 ^ 256 by simp [messageBits], Nat.cast_pow, Nat.cast_ofNat]
+    _ ≤ ((2 ^ 256 : Nat) : ℝ≥0∞)⁻¹ := closing_sum
+
 /-- The scheme is `2⁻²⁵⁶`-complete. -/
 theorem complete : SphincsCompletenessStatement := by
   calc
