@@ -72,11 +72,12 @@ def compareSuccessState (state : MachineState) : MachineState :=
   let state := execInstrBr state (.LD .x11 .x7 8)
   execInstrBr state (.BEQ .x10 .x11 8)
 
-theorem compareSuccess_block (state : MachineState)
+theorem compareSuccess_block_and_pc (state : MachineState)
     (pc : state.pc = 0x1134)
     (low : state.getMem 0x42000 = state.getMem 0x40)
     (high : state.getMem 0x42008 = state.getMem 0x48) :
-    OrdinarySteps SphincsImages.verify state 9 (compareSuccessState state) := by
+    OrdinarySteps SphincsImages.verify state 9 (compareSuccessState state) ∧
+      (compareSuccessState state).pc = 0x1160 := by
   let s1 := execInstrBr state (.LUI .x6 0x42)
   let s2 := execInstrBr s1 (.ADDI .x6 .x6 0)
   let s3 := execInstrBr s2 (.ADDI .x7 .x0 64)
@@ -125,6 +126,9 @@ theorem compareSuccess_block (state : MachineState)
     simp [s6, execInstrBr, firstEqual, p5, signExtend13]
   have p7 : s7.pc = 0x1154 := by simp [s7, execInstrBr, p6]
   have p8 : s8.pc = 0x1158 := by simp [s8, execInstrBr, p7]
+  have p9 : s9.pc = 0x1160 := by
+    simp [s9, execInstrBr, secondEqual, p8, signExtend13]
+  refine ⟨?_, ?_⟩
   apply OrdinarySteps.step state s1 _ (.base (.LUI .x6 0x42)) 8
   · rw [fetch_compare state ⟨0, by decide⟩ (by simpa using pc)]; decide
   · rfl
@@ -162,16 +166,26 @@ theorem compareSuccess_block (state : MachineState)
   · rw [fetch_compare s8 ⟨9, by decide⟩ (by simpa using p8)]; decide
   · rfl
   exact OrdinarySteps.refl _
+  simpa [compareSuccessState, s1, s2, s3, s4, s5, s6, s7, s8, s9]
+    using p9
+
+theorem compareSuccess_block (state : MachineState)
+    (pc : state.pc = 0x1134)
+    (low : state.getMem 0x42000 = state.getMem 0x40)
+    (high : state.getMem 0x42008 = state.getMem 0x48) :
+    OrdinarySteps SphincsImages.verify state 9 (compareSuccessState state) :=
+  (compareSuccess_block_and_pc state pc low high).1
 
 /-- The HASH answer feeds the two-word comparison without changing the loaded public key. -/
-theorem hashAnswer_compare_block (state : MachineState) (answer : BitVec 256)
+theorem hashAnswer_compare_block_and_pc (state : MachineState) (answer : BitVec 256)
     (pc : state.pc = 0x1130)
     (destination : state.getReg .x12 = 0x42000)
     (low : answer.extractLsb' 0 64 = state.getMem 0x40)
     (high : answer.extractLsb' 64 64 = state.getMem 0x48) :
     OrdinarySteps SphincsImages.verify (writeHash state answer) 9
-      (compareSuccessState (writeHash state answer)) := by
-  apply compareSuccess_block
+      (compareSuccessState (writeHash state answer)) ∧
+      (compareSuccessState (writeHash state answer)).pc = 0x1160 := by
+  apply compareSuccess_block_and_pc
   · simp [writeHash, pc]
   · have keyFrame : (writeHash state answer).getMem 0x40 =
         state.getMem 0x40 := by
@@ -184,8 +198,17 @@ theorem hashAnswer_compare_block (state : MachineState) (answer : BitVec 256)
     rw [writeHash_high state answer destination, keyFrame]
     exact high
 
+theorem hashAnswer_compare_block (state : MachineState) (answer : BitVec 256)
+    (pc : state.pc = 0x1130)
+    (destination : state.getReg .x12 = 0x42000)
+    (low : answer.extractLsb' 0 64 = state.getMem 0x40)
+    (high : answer.extractLsb' 64 64 = state.getMem 0x48) :
+    OrdinarySteps SphincsImages.verify (writeHash state answer) 9
+      (compareSuccessState (writeHash state answer)) :=
+  (hashAnswer_compare_block_and_pc state answer pc destination low high).1
+
 /-- A loaded public key matching the HASH result takes the exact success path. -/
-theorem loaded_hashAnswer_compare (publicKey : SigGolf.PublicKey)
+theorem loaded_hashAnswer_compare_and_pc (publicKey : SigGolf.PublicKey)
     (message : Message) (witness : Bytes SphincsWire.signatureBytes)
     (state : MachineState) (answer : BitVec 256)
     (loaded : initialState submission .verify (message, publicKey, witness) = some state)
@@ -193,7 +216,9 @@ theorem loaded_hashAnswer_compare (publicKey : SigGolf.PublicKey)
       answer.extractLsb' (64 * index.val) 64 =
         publicKey.extractLsb' (64 * index.val) 64) :
     OrdinarySteps SphincsImages.verify (writeHash (firstHashState state) answer) 9
-      (compareSuccessState (writeHash (firstHashState state) answer)) := by
+      (compareSuccessState (writeHash (firstHashState state) answer)) ∧
+      (compareSuccessState (writeHash (firstHashState state) answer)).pc =
+        0x1160 := by
   have entryPc : state.pc = 0x1000 := by
     obtain ⟨initial, same, pc⟩ := initialState_exists submission admissible
       .verify (message, publicKey, witness)
@@ -201,7 +226,7 @@ theorem loaded_hashAnswer_compare (publicKey : SigGolf.PublicKey)
     cases Option.some.inj same
     exact pc
   have destination := (firstHash_registers state).2.2.1
-  apply hashAnswer_compare_block (firstHashState state) answer
+  apply hashAnswer_compare_block_and_pc (firstHashState state) answer
     (firstHash_pc state entryPc) destination
   · have word := firstHash_publicKey_word publicKey message witness state
         loaded 0
@@ -215,6 +240,18 @@ theorem loaded_hashAnswer_compare (publicKey : SigGolf.PublicKey)
         publicKey.extractLsb' 64 64 := by simpa using word
     rw [word1]
     exact answerMatches 1
+
+theorem loaded_hashAnswer_compare (publicKey : SigGolf.PublicKey)
+    (message : Message) (witness : Bytes SphincsWire.signatureBytes)
+    (state : MachineState) (answer : BitVec 256)
+    (loaded : initialState submission .verify (message, publicKey, witness) = some state)
+    (answerMatches : ∀ index : Fin 2,
+      answer.extractLsb' (64 * index.val) 64 =
+        publicKey.extractLsb' (64 * index.val) 64) :
+    OrdinarySteps SphincsImages.verify (writeHash (firstHashState state) answer) 9
+      (compareSuccessState (writeHash (firstHashState state) answer)) :=
+  (loaded_hashAnswer_compare_and_pc publicKey message witness state answer
+    loaded answerMatches).1
 
 /-- The exact loaded trace reaches the instruction after both commitment comparisons. -/
 theorem loaded_firstHash_compare_executes (hash : Hash)
