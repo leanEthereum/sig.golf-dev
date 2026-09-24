@@ -4,7 +4,7 @@ namespace SphincsSecurity.Concrete
 open _root_.OracleComp OracleSpec ENNReal
 
 private theorem largeRangeClosing (x : ℝ) (hx : 3 / 16384 ≤ x) :
-    2 * x - x ^ 2 + (11 / 65536) * x + (x / 2 ^ 41 + 1 / 2 ^ 700) ≤ 2 * x := by
+    2 * x - x ^ 2 + (11 / 65536) * x + (x / 2 ^ 27 + 1 / 2 ^ 700) ≤ 2 * x := by
   have hn : 0 ≤ x := le_trans (by norm_num) hx
   have hs := mul_nonneg (sub_nonneg.mpr hx) hn
   have he : (1 : ℝ) / 2 ^ 700 ≤ 1 / 1099511627776 := by

@@ -34,9 +34,9 @@ theorem randomizerHashInput_ne_tweakableHashInput (p₁ p₂ : PublicParameter)
   have htag := congrArg TweakFields.tag (fieldBytes_injective htweak)
   cases domain <;> simp [hashDomainFields, tweakFields] at htag
 
-/-- Every seed-derived input puts the complete seed in bytes 32 through 63. -/
+/-- Every seed-derived input puts the complete seed in bytes 36 through 67. -/
 def DerivationSeedHit (input : HashInput) (seed : MasterSeed) : Prop :=
-  (input.drop 32).take 32 = bytesLE 32 seed
+  (input.drop 36).take 32 = bytesLE 32 seed
 
 theorem derivationSeedHit_keygen (parameter : PublicParameter) (domain : KeygenDomain) (seed : MasterSeed) :
     DerivationSeedHit (keygenHashInput parameter domain seed) seed := by

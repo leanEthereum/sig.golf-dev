@@ -33,19 +33,31 @@ theorem sequenceLayers_map {m : Type → Type} [Monad m] [LawfulMonad m]
   | some bottom =>
       simp only [Option.map_some, map_bind]
       apply bind_congr
-      intro middle
-      cases middle with
+      intro middle3
+      cases middle3 with
       | none => simp only [Option.map_none, map_pure]
-      | some middle =>
+      | some middle3 =>
           simp only [Option.map_some, map_bind]
           apply bind_congr
-          intro top
-          cases top with
+          intro middle2
+          cases middle2 with
           | none => simp only [Option.map_none, map_pure]
-          | some top =>
-              simp only [Option.map_some, map_pure]
-              congr 2
-              funext lay
-              fin_cases lay <;> rfl
+          | some middle2 =>
+              simp only [Option.map_some, map_bind]
+              apply bind_congr
+              intro middle
+              cases middle with
+              | none => simp only [Option.map_none, map_pure]
+              | some middle =>
+                  simp only [Option.map_some, map_bind]
+                  apply bind_congr
+                  intro top
+                  cases top with
+                  | none => simp only [Option.map_none, map_pure]
+                  | some top =>
+                      simp only [Option.map_some, map_pure]
+                      congr 2
+                      funext lay
+                      fin_cases lay <;> rfl
 
 end SphincsSecurity

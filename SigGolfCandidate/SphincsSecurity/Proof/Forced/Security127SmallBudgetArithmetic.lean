@@ -2,6 +2,7 @@ import SigGolfCandidate.SphincsSecurity.Proof.Fts.CertificateCacheExceptionGrowt
 namespace SphincsSecurity.Concrete
 
 open ENNReal
+set_option maxRecDepth 4096
 
 /-- The per-slot bound on the forced FTS near-certificate probability at hash budget `budget`: every omitted tree pays the average terminal certificate price, the cache exception and the proposal prefix exception. -/
 noncomputable def nearCertificateBound (budget : Nat) : ENNReal :=
@@ -12,7 +13,7 @@ set_option exponentiation.threshold 1024
 
 private theorem smallRangeClosing (x : ℝ) (hlow : 1 / 2 ^ 128 ≤ x) (hhigh : x ≤ 3 / 16384) :
     7 / 4 * x + 11 / 65536 * x + 1 / 2 ^ 700 + x ^ 2 * 2 +
-      16384 / 16381 * x * (557 * x + 14 * (x / 2 ^ 41) + 14 / 2 ^ 700) ≤ 2 * x := by
+      16384 / 16381 * x * ((20 * 557 / 14) * x + 20 * (x / 2 ^ 27) + 20 / 2 ^ 700) ≤ 2 * x := by
   have hn : 0 ≤ x := le_trans (by positivity) hlow
   have hsq : x * x ≤ x * (3 / 16384) := mul_le_mul_of_nonneg_left hhigh hn
   have htail : (1 : ℝ) / 2 ^ 700 ≤ x / 2 ^ 572 := by
@@ -57,10 +58,10 @@ theorem small_bound_le_security127 (q : Nat) (hq : 1 ≤ q) (hsmall : q ≤ budg
       exact_mod_cast (show 16381 * 2 ^ 114 ≤ 2 ^ 128 - q by omega)
     exact_mod_cast h
   have hrate : nearCertificateBound q ≤
-      14 * ((q : ENNReal) * (((557 : ENNReal) / 14) / (2 ^ 128 : Nat)) +
-        ((q : ENNReal) * (2 ^ 169 : ENNReal)⁻¹ + (2 ^ 700 : ENNReal)⁻¹)) := by
+      20 * ((q : ENNReal) * (((557 : ENNReal) / 14) / (2 ^ 128 : Nat)) +
+        ((q : ENNReal) * (2 ^ 155 : ENNReal)⁻¹ + (2 ^ 700 : ENNReal)⁻¹)) := by
     unfold nearCertificateBound
-    rw [nearCertificatePrice_def, proposalPrefixExceptionBound_def, show Fintype.card FtsTree = 14 from Fintype.card_fin _,
+    rw [nearCertificatePrice_def, proposalPrefixExceptionBound_def, show Fintype.card FtsTree = 20 from Fintype.card_fin _,
       Nat.cast_ofNat]
     gcongr
     exact certificateCacheExceptionRate_le
