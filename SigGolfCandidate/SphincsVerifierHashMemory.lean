@@ -117,6 +117,62 @@ theorem header_scratch (state : MachineState) (slot : Fin 4) :
     position_scratch afterTag slot tagPointer,
     tag_scratch state slot]
 
+/-- Header construction changes only its three 64-bit buffer words. -/
+theorem header_mem_frame (state : MachineState) (read : Word)
+    (first : read ≠ 0x40000) (second : read ≠ 0x40008)
+    (third : read ≠ 0x40010) :
+    (SphincsVerifierHeader.headerState state).getMem read =
+      state.getMem read := by
+  let tagged := SphincsVerifierHeader.tagState state
+  let positioned := SphincsVerifierHeader.positionState tagged
+  let treed := SphincsVerifierHeader.treeState positioned
+  have tagPointer := SphincsVerifierHeader.tag_hash_pointer state
+  have positionPointer : positioned.getReg .x7 = 0x40000 :=
+    (SphincsVerifierHeader.position_hash_pointer tagged).trans tagPointer
+  have treePointer : treed.getReg .x7 = 0x40000 :=
+    (SphincsVerifierHeader.tree_hash_pointer positioned).trans positionPointer
+  change (SphincsVerifierHeader.indexState treed).getMem read = state.getMem read
+  simp only [SphincsVerifierHeader.indexState, execInstrBr,
+    MachineState.getMem_setPC]
+  rw [SphincsVerifierHeader.indexBeforeStore_pointer, treePointer,
+    setWord32_eq]
+  have indexAddress : (0x40000 : Word) + signExtend12 (16 : BitVec 12) =
+      0x40010 := by decide
+  rw [indexAddress,
+    show alignToDword (0x40010 : Word) = 0x40010 by decide,
+    MachineState.getMem_setMem_ne third,
+    SphincsVerifierHeader.indexBeforeStore_memory]
+  change (SphincsVerifierHeader.treeState positioned).getMem read =
+    state.getMem read
+  simp only [SphincsVerifierHeader.treeState, execInstrBr,
+    MachineState.getMem_setPC]
+  rw [SphincsVerifierHeader.treeBeforeStore_pointer, positionPointer]
+  have treeAddress : (0x40000 : Word) + signExtend12 (8 : BitVec 12) =
+      0x40008 := by decide
+  rw [treeAddress, MachineState.getMem_setMem_ne second,
+    SphincsVerifierHeader.treeBeforeStore_memory]
+  change (SphincsVerifierHeader.positionState tagged).getMem read =
+    state.getMem read
+  simp only [SphincsVerifierHeader.positionState, execInstrBr,
+    MachineState.getMem_setPC]
+  rw [SphincsVerifierHeader.positionBeforeStore_pointer, tagPointer,
+    setWord32_eq]
+  have positionAddress : (0x40000 : Word) + signExtend12 (4 : BitVec 12) =
+      0x40004 := by decide
+  rw [positionAddress]
+  have positionDword : alignToDword (0x40004 : Word) = 0x40000 := by decide
+  rw [positionDword, MachineState.getMem_setMem_ne first,
+    SphincsVerifierHeader.positionBeforeStore_memory]
+  change (SphincsVerifierHeader.tagState state).getMem read =
+    state.getMem read
+  simp only [SphincsVerifierHeader.tagState, execInstrBr,
+    MachineState.getMem_setPC]
+  rw [SphincsVerifierHeader.tagBeforeStore_pointer, setWord32_eq,
+    show (0x40000 : Word) + signExtend12 (0 : BitVec 12) = 0x40000 by decide,
+    show alignToDword (0x40000 : Word) = 0x40000 by decide,
+    MachineState.getMem_setMem_ne first,
+    SphincsVerifierHeader.tagBeforeStore_memory]
+
 theorem firstHash_scratch (state : MachineState) (slot : Fin 4) :
     (firstHashState state).getMem
       (BitVec.ofNat 64 (0x43000 + 8 * slot.val)) = 0 := by
@@ -124,6 +180,63 @@ theorem firstHash_scratch (state : MachineState) (slot : Fin 4) :
     SphincsVerifierHashSetup.hashRegisters_memory,
     header_scratch]
   exact setupAndBoth_scratch state slot
+
+theorem setupAndBoth_publicKey_frame (state : MachineState) (index : Fin 2) :
+    (setupAndBothState state).getMem
+      (BitVec.ofNat 64 (0x40 + 8 * index.val)) =
+      state.getMem (BitVec.ofNat 64 (0x40 + 8 * index.val)) := by
+  let read := BitVec.ofNat 64 (0x40 + 8 * index.val)
+  let jumped := execInstrBr state (.JAL .x0 16)
+  let scratch := SphincsVerifierSlots.headerState jumped
+  let firstPointers := addressSetupState scratch
+  let firstCopy := copyRootState firstPointers
+  let secondPointers := parameterPointers firstCopy
+  have firstDestination := (addressSetup_regs scratch).2
+  have secondDestination := (parameterPointers_regs firstCopy).2
+  have firstOutside : ∀ offset : Fin 5, read ≠ alignToDword
+      (firstPointers.getReg .x7 + signExtend12
+        (4#12 * BitVec.ofNat 12 offset.val)) := by
+    intro offset
+    rw [firstDestination]
+    fin_cases index <;> fin_cases offset <;> decide
+  have secondOutside : ∀ offset : Fin 5, read ≠ alignToDword
+      (secondPointers.getReg .x7 + signExtend12
+        (4#12 * BitVec.ofNat 12 offset.val)) := by
+    intro offset
+    rw [secondDestination]
+    fin_cases index <;> fin_cases offset <;> decide
+  change (copyRootState secondPointers).getMem read = state.getMem read
+  rw [copyRoot_mem_frame secondPointers read secondOutside,
+    parameterPointers_memory,
+    copyRoot_mem_frame firstPointers read firstOutside,
+    addressSetup_memory]
+  change (SphincsVerifierSlots.headerState jumped).getMem read =
+    state.getMem read
+  simp only [SphincsVerifierSlots.headerState]
+  have slotOutside (slot : Fin 4) :
+      read ≠ BitVec.ofNat 64 (0x43000 + 8 * slot.val) := by
+    fin_cases index <;> fin_cases slot <;> decide
+  rw [SphincsVerifierSlots.slot_memory 3,
+    if_neg (slotOutside 3), SphincsVerifierSlots.slot_memory 2,
+    if_neg (slotOutside 2), SphincsVerifierSlots.slot_memory 1,
+    if_neg (slotOutside 1), SphincsVerifierSlots.slot_memory 0,
+    if_neg (slotOutside 0)]
+  simp [jumped, execInstrBr]
+
+theorem firstHash_publicKey_frame (state : MachineState) (index : Fin 2) :
+    (firstHashState state).getMem
+      (BitVec.ofNat 64 (0x40 + 8 * index.val)) =
+      state.getMem (BitVec.ofNat 64 (0x40 + 8 * index.val)) := by
+  let read := BitVec.ofNat 64 (0x40 + 8 * index.val)
+  change (SphincsVerifierHashSetup.hashRegistersState
+    (SphincsVerifierHeader.headerState (setupAndBothState state))).getMem
+      read = state.getMem read
+  rw [SphincsVerifierHashSetup.hashRegisters_memory]
+  have outside0 : read ≠ 0x40000 := by fin_cases index <;> decide
+  have outside8 : read ≠ 0x40008 := by fin_cases index <;> decide
+  have outside16 : read ≠ 0x40010 := by fin_cases index <;> decide
+  rw [header_mem_frame _ _ outside0 outside8 outside16,
+    setupAndBoth_publicKey_frame]
 
 theorem position_value_after_copies (state : MachineState) :
     (SphincsVerifierHeader.positionState
@@ -420,5 +533,21 @@ theorem firstHash_index (state : MachineState) :
  Quot.sound] -/
 #guard_msgs in
 #print axioms firstHash_parameter_frame
+
+/-- info: 'SigGolfCandidate.SphincsVerifierHashMemory.header_mem_frame' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms header_mem_frame
+
+/-- info: 'SigGolfCandidate.SphincsVerifierHashMemory.setupAndBoth_publicKey_frame' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound] -/
+#guard_msgs in
+#print axioms setupAndBoth_publicKey_frame
+
+/-- info: 'SigGolfCandidate.SphincsVerifierHashMemory.firstHash_publicKey_frame' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound] -/
+#guard_msgs in
+#print axioms firstHash_publicKey_frame
 
 end SigGolfCandidate.SphincsVerifierHashMemory

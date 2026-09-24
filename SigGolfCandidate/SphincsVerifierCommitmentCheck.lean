@@ -9,6 +9,9 @@ answer with the 16-byte public key supplied by the organizer.
 
 namespace SigGolfCandidate.SphincsVerifierCommitmentCheck
 open SigGolf SigGolf.Riscv RiscvZkvm.Rv64
+open SigGolfCandidate.SphincsVerifierLoader
+open SigGolfCandidate.SphincsVerifierHashSetup
+open SigGolfCandidate.SphincsSubmission
 
 /-- Exact image words for the two commitment/public-key comparisons. -/
 def comparePrefix : List (BitVec 32) := [
@@ -181,6 +184,64 @@ theorem hashAnswer_compare_block (state : MachineState) (answer : BitVec 256)
     rw [writeHash_high state answer destination, keyFrame]
     exact high
 
+/-- A loaded public key matching the HASH result takes the exact success path. -/
+theorem loaded_hashAnswer_compare (publicKey : SigGolf.PublicKey)
+    (message : Message) (witness : Bytes SphincsWire.signatureBytes)
+    (state : MachineState) (answer : BitVec 256)
+    (loaded : initialState submission .verify (message, publicKey, witness) = some state)
+    (answerMatches : ∀ index : Fin 2,
+      answer.extractLsb' (64 * index.val) 64 =
+        publicKey.extractLsb' (64 * index.val) 64) :
+    OrdinarySteps SphincsImages.verify (writeHash (firstHashState state) answer) 9
+      (compareSuccessState (writeHash (firstHashState state) answer)) := by
+  have entryPc : state.pc = 0x1000 := by
+    obtain ⟨initial, same, pc⟩ := initialState_exists submission admissible
+      .verify (message, publicKey, witness)
+    rw [loaded] at same
+    cases Option.some.inj same
+    exact pc
+  have destination := (firstHash_registers state).2.2.1
+  apply hashAnswer_compare_block (firstHashState state) answer
+    (firstHash_pc state entryPc) destination
+  · have word := firstHash_publicKey_word publicKey message witness state
+        loaded 0
+    have word0 : (firstHashState state).getMem 0x40 =
+        publicKey.extractLsb' 0 64 := by simpa using word
+    rw [word0]
+    exact answerMatches 0
+  · have word := firstHash_publicKey_word publicKey message witness state
+        loaded 1
+    have word1 : (firstHashState state).getMem 0x48 =
+        publicKey.extractLsb' 64 64 := by simpa using word
+    rw [word1]
+    exact answerMatches 1
+
+/-- The exact loaded trace reaches the instruction after both commitment comparisons. -/
+theorem loaded_firstHash_compare_executes (hash : Hash)
+    (publicKey : SigGolf.PublicKey) (message : Message)
+    (witness : Bytes SphincsWire.signatureBytes)
+    (inner : SphincsSecurity.PublicKey) (state : MachineState)
+    (loaded : initialState submission .verify (message, publicKey, witness) = some state)
+    (encoded : EncodedWitness witness inner)
+    (answerMatches : ∀ index : Fin 2,
+      (hash (SigGolfCandidate.SphincsBridge.toQuery
+        (SphincsWire.commitmentInput inner))).extractLsb'
+          (64 * index.val) 64 =
+        publicKey.extractLsb' (64 * index.val) 64)
+    (steps : Nat) (result : Execution)
+    (tail : Executes hash SphincsImages.verify
+      (compareSuccessState (writeHash (firstHashState state)
+        (hash (SigGolfCandidate.SphincsBridge.toQuery
+          (SphincsWire.commitmentInput inner))))) steps result) :
+    Executes hash SphincsImages.verify state (((steps + 9) + 1) + 73)
+      (((result.charge 9 0 0).charge 8 1 1).charge 73 0 0) := by
+  have comparison := loaded_hashAnswer_compare publicKey message witness state
+    (hash (SigGolfCandidate.SphincsBridge.toQuery
+      (SphincsWire.commitmentInput inner))) loaded answerMatches
+  exact loaded_firstHash_executes hash publicKey message witness inner state
+    loaded encoded (steps + 9) (result.charge 9 0 0)
+    (comparison.then_executes tail)
+
 /-- info: 'SigGolfCandidate.SphincsVerifierCommitmentCheck.compareSuccess_block' depends on axioms: [propext,
  Classical.choice,
  Quot.sound] -/
@@ -210,5 +271,17 @@ theorem hashAnswer_compare_block (state : MachineState) (answer : BitVec 256)
  Quot.sound] -/
 #guard_msgs in
 #print axioms hashAnswer_compare_block
+
+/-- info: 'SigGolfCandidate.SphincsVerifierCommitmentCheck.loaded_hashAnswer_compare' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound] -/
+#guard_msgs in
+#print axioms loaded_hashAnswer_compare
+
+/-- info: 'SigGolfCandidate.SphincsVerifierCommitmentCheck.loaded_firstHash_compare_executes' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound] -/
+#guard_msgs in
+#print axioms loaded_firstHash_compare_executes
 
 end SigGolfCandidate.SphincsVerifierCommitmentCheck

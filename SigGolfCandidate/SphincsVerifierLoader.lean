@@ -103,6 +103,23 @@ theorem loaded_publicKey_word (publicKey : SigGolf.PublicKey)
   simpa only [quotient, remainder] using
     extractByte_slice publicKey (8 * index.val + byte)
 
+theorem firstHash_publicKey_word (publicKey : SigGolf.PublicKey)
+    (message : Message) (witness : Bytes SphincsWire.signatureBytes)
+    (state : MachineState)
+    (loaded : initialState submission .verify (message, publicKey, witness) = some state)
+    (index : Fin 2) :
+    (firstHashState state).getMem
+      (BitVec.ofNat 64 (0x40 + 8 * index.val)) =
+      publicKey.extractLsb' (64 * index.val) 64 := by
+  rw [SphincsVerifierHashMemory.firstHash_publicKey_frame]
+  exact loaded_publicKey_word publicKey message witness state loaded index
+
+/-- info: 'SigGolfCandidate.SphincsVerifierLoader.firstHash_publicKey_word' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound] -/
+#guard_msgs in
+#print axioms firstHash_publicKey_word
+
 /-- info: 'SigGolfCandidate.SphincsVerifierLoader.loaded_publicKey_word' depends on axioms: [propext,
  Classical.choice,
  Quot.sound] -/
