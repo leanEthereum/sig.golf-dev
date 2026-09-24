@@ -1,16 +1,10 @@
-import SigGolfCandidate.SphincsImages
-import SigGolfCandidate.SphincsWire
+import SigGolfCandidate.SphincsSubmission
 
 namespace SigGolfCandidate.SphincsExpandSmoke
 open SigGolf OracleComp RiscvZkvm.Rv64
 set_option maxRecDepth 16384
 
-def submission : Submission where
-  sizes := ⟨SphincsWire.signatureBytes, SphincsWire.signatureBytes⟩
-  layout := Riscv.standardLayout ⟨SphincsWire.signatureBytes, SphincsWire.signatureBytes⟩
-  image
-    | .expand => SphincsImages.expand
-    | _ => SphincsImages.verify
+def submission : Submission := SphincsSubmission.submission
 
 def smoke : Bool := Id.run do
   let signature : Bytes SphincsWire.signatureBytes := BitVec.ofNat _ 0x1234abcd
@@ -29,5 +23,11 @@ def verifyRejectsZero : Bool := Id.run do
   return result.exit == Riscv.Exit.failure && result.hashCalls == 220
 
 #eval verifyRejectsZero
+
+def allInstructionsDecode : Bool :=
+  ([Phase.keygen, .sign, .expand, .verify]).all fun phase =>
+    (submission.image phase).code.all fun word => (Riscv.decodeInstruction word).isSome
+
+#eval allInstructionsDecode
 
 end SigGolfCandidate.SphincsExpandSmoke

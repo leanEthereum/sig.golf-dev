@@ -56,6 +56,7 @@ class Machine:
                 elif funct3 == 5:
                     assert word >> 26 == 0
                     r[rd] >>= (word >> 20) & 63
+                elif funct3 == 4: r[rd] ^= immediate & MASK
                 elif funct3 == 7: r[rd] &= immediate & MASK
                 else: raise AssertionError(("op-imm", hex(word), hex(self.pc)))
             elif opcode == 0x33:
