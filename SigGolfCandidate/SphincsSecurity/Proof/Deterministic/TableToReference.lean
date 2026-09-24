@@ -57,7 +57,7 @@ theorem referenceBudget_from_table (adversary : Adversary) (q : Nat)
   rw [hasHashQueryBound_iff, Concrete.gameCore_eq_secrets]
   have htail (parameter : PublicParameter) (ots : OtsSecrets) (fts : FtsSecrets) :
       HashQueryBound (Concrete.gameAfterSecrets (memoAdversary adversary) parameter ots fts) ∅ q := by
-    let high : Secrets := (fun _ _ _ _ => 0, fun _ _ _ => 0)
+    let high : HighSecrets := (fun _ _ _ _ => 0, fun _ _ _ => 0)
     have h := hashQueryBound_reference_afterSecrets adversary (outputHalves.symm (parameter, 0))
       (secretHalves.symm ((ots, fts), high)) q (hbound _ _)
     simpa only [truncate_from_halves, tableOts_from_halves, tableFts_from_halves] using h

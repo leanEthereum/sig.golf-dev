@@ -21,10 +21,10 @@ theorem indexGroup_eq_ftsIndexOf_or_last (tree : IndexGroup) :
     rfl
   · right
     apply Fin.ext
-    change tree.val = 20
-    change ¬ tree.val < 20 at htree
+    change tree.val = 24
+    change ¬ tree.val < 24 at htree
     have hlt := tree.isLt
-    change tree.val < 21 at hlt
+    change tree.val < 25 at hlt
     omega
 
 end SphincsSecurity.Concrete

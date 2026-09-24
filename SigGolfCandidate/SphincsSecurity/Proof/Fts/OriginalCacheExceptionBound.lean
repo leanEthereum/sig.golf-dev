@@ -246,7 +246,7 @@ theorem certificateContextGame_exception_le_cache_add_prefix (adversary : Advers
 theorem originalCertificateSource_full_le_original_message_add_prefix (adversary : Adversary) (q : Nat)
     (hbudget : q ≤ 2 ^ 127) (hbound : HasHashQueryBound scheme adversary q) :
     Pr[OriginalFullCertificate | originalCertificateSource adversary] ≤
-      ((2 ^ 128 : ENNReal)⁻¹ + certificateCacheExceptionRate) * originalCertificateMessageCost adversary +
+      ((2 ^ 144 : ENNReal)⁻¹ + certificateCacheExceptionRate) * originalCertificateMessageCost adversary +
       (q : ENNReal) * fullCertificateExcessRate +
       Pr[fun result => ProposalPrefixExceptional result.2.2.2.2.1.proposals result.2.2.2.2.1.log.length |
         certificateContextGame adversary q Finset.univ (fun _ => proposalPrefixStop) false] := by
@@ -254,7 +254,7 @@ theorem originalCertificateSource_full_le_original_message_add_prefix (adversary
     (add_le_add (certificateContextGame_cache_hit_le_original_message adversary q Finset.univ (fun _ => proposalPrefixStop) false) le_rfl)
   apply (originalCertificateSource_full_le_original_message_add_exception adversary q hbudget hbound).trans
   calc
-    _ ≤ (2 ^ 128 : ENNReal)⁻¹ * originalCertificateMessageCost adversary + (q : ENNReal) * fullCertificateExcessRate +
+    _ ≤ (2 ^ 144 : ENNReal)⁻¹ * originalCertificateMessageCost adversary + (q : ENNReal) * fullCertificateExcessRate +
         (originalCertificateMessageCost adversary * certificateCacheExceptionRate +
           Pr[fun result => ProposalPrefixExceptional result.2.2.2.2.1.proposals result.2.2.2.2.1.log.length |
             certificateContextGame adversary q Finset.univ (fun _ => proposalPrefixStop) false]) := add_le_add le_rfl he
@@ -266,15 +266,25 @@ theorem original_primitive_add_full_certificate_le_small_budget_add_prefix (dumm
     Pr[GraphPrimitiveEvent dummy | referenceGraphContextGame contactObserver (canonicalGraphGameInputs adversary)
       (canonicalEncodingInputs_subset_gameInputs adversary) dummy adversary] +
       Pr[OriginalFullCertificate | originalCertificateSource adversary] ≤
-      primitiveCoefficient * ((q : ENNReal) / 2 ^ 128) + (q : ENNReal) * fullCertificateExcessRate +
+      primitiveCoefficient * ((q : ENNReal) / 2 ^ 144) + (q : ENNReal) * fullCertificateExcessRate +
       Pr[fun result => ProposalPrefixExceptional result.2.2.2.2.1.proposals result.2.2.2.2.1.log.length |
         certificateContextGame adversary q Finset.univ (fun _ => proposalPrefixStop) false] := by
   have hbudget : q ≤ 2 ^ 127 := hsmall.trans budgetSplit_le
-  have hcard : Fintype.card Digest = 2 ^ 128 := by simp [digestBits]
-  have hp := referenceGraphContextGame_primitive_small_budget dummy adversary q hbound hsmall
-  rw [hcard] at hp
-  simp only [Nat.cast_pow, Nat.cast_ofNat] at hp
-  have hrate : (2 ^ 128 : ENNReal)⁻¹ + certificateCacheExceptionRate ≤ primitiveCoefficient / 2 ^ 128 := by
+  have hcard : Fintype.card Digest = 2 ^ 160 := by simp [digestBits]
+  have hsmallcard : q < Fintype.card Digest :=
+    hsmall.trans_lt (budgetSplit_le.trans_lt (by rw [hcard]; norm_num))
+  have hr := primitive_rates_small q hsmall
+  have hcoeff : primitiveCoefficient / Fintype.card Digest ≤ primitiveCoefficient / 2 ^ 144 := by
+    rw [hcard, primitiveCoefficient_def]
+    apply (ENNReal.toReal_le_toReal (by finiteness) (by finiteness)).mp
+    norm_num [ENNReal.toReal_div]
+  have ho : (Fintype.card Digest : ENNReal)⁻¹ ≤ primitiveCoefficient / 2 ^ 144 := by
+    rw [hcard, primitiveCoefficient_def]
+    apply (ENNReal.toReal_le_toReal (by finiteness) (by finiteness)).mp
+    norm_num [ENNReal.toReal_inv, ENNReal.toReal_div]
+  have hp := referenceGraphContextGame_primitive_joint_budget dummy adversary q hbound hsmallcard
+    (primitiveCoefficient / 2 ^ 144) (hr.1.trans hcoeff) (hr.2.trans hcoeff) ho
+  have hrate : (2 ^ 144 : ENNReal)⁻¹ + certificateCacheExceptionRate ≤ primitiveCoefficient / 2 ^ 144 := by
     apply (add_le_add le_rfl certificateCacheExceptionRate_le).trans
     rw [primitiveCoefficient_def]
     apply (ENNReal.toReal_le_toReal (by finiteness) (by finiteness)).mp
@@ -284,7 +294,7 @@ theorem original_primitive_add_full_certificate_le_small_budget_add_prefix (dumm
   calc
     _ ≤ Pr[GraphPrimitiveEvent dummy | referenceGraphContextGame contactObserver (canonicalGraphGameInputs adversary)
           (canonicalEncodingInputs_subset_gameInputs adversary) dummy adversary] +
-        ((primitiveCoefficient / 2 ^ 128) *
+        ((primitiveCoefficient / 2 ^ 144) *
           (∑' result, Pr[= result | referenceRecordedGame (canonicalGraphGameInputs adversary)
             (canonicalEncodingInputs_subset_gameInputs adversary) dummy adversary] * (result.messageCalls : ENNReal)) +
           (q : ENNReal) * fullCertificateExcessRate +
@@ -292,6 +302,6 @@ theorem original_primitive_add_full_certificate_le_small_budget_add_prefix (dumm
             certificateContextGame adversary q Finset.univ (fun _ => proposalPrefixStop) false]) := add_le_add le_rfl hc
     _ ≤ _ := by
       rw [← add_assoc, ← add_assoc]
-      exact add_le_add (add_le_add hp le_rfl) le_rfl
+      exact add_le_add (add_le_add (by simpa only [div_eq_mul_inv, mul_assoc, mul_comm, mul_left_comm] using hp) le_rfl) le_rfl
 
 end SphincsSecurity.Concrete

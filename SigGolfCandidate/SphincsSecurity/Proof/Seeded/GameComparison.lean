@@ -7,13 +7,13 @@ namespace SphincsSecurity.Seeded
 set_option backward.isDefEq.respectTransparency false
 set_option maxRecDepth 4096
 
-abbrev KeyMaterial := PublicParameter × Secrets × Digest × Secrets
+abbrev KeyMaterial := PublicParameter × Secrets × HighDigest × HighSecrets
 
 noncomputable def drawKeyMaterial : ProbComp KeyMaterial := do
   let parameter ← Concrete.sampleParameter
   let secret ← sampleSecrets
-  let parameterHigh ← $ᵗ Digest
-  let secretHigh ← sampleSecrets
+  let parameterHigh ← $ᵗ HighDigest
+  let secretHigh ← sampleHighSecrets
   return (parameter, secret, parameterHigh, secretHigh)
 
 noncomputable def materialCache (seed : MasterSeed) (material : KeyMaterial) : QueryCache HashSpec :=

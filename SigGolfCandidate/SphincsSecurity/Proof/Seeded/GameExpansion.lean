@@ -69,8 +69,8 @@ noncomputable def programmedGame (adversary : Adversary) : ProbComp Bool := do
   let seed ← sampleMasterSeed
   let parameter ← Concrete.sampleParameter
   let secret ← sampleSecrets
-  let parameterHigh ← $ᵗ Digest
-  let secretHigh ← sampleSecrets
+  let parameterHigh ← $ᵗ HighDigest
+  let secretHigh ← sampleHighSecrets
   (simulateQ romImpl (Concrete.gameAfterSecrets adversary parameter secret.1 secret.2)).run'
     (programmedCache seed parameter secret parameterHigh secretHigh)
 
@@ -93,9 +93,9 @@ theorem evalSPMF_gameCore_eq_programmed (adversary : Adversary) :
     apply OracleComp.DeferredSampling.evalSPMF_bind_congr_left
     intro parameter
     trans 𝒮[do
-      let parameterHigh ← $ᵗ Digest
+      let parameterHigh ← $ᵗ HighDigest
       let secret ← sampleSecrets
-      let secretHigh ← sampleSecrets
+      let secretHigh ← sampleHighSecrets
       (simulateQ romImpl (Concrete.gameAfterSecrets adversary parameter secret.1 secret.2)).run'
         (programmedCache seed parameter secret parameterHigh secretHigh)]
     · apply OracleComp.DeferredSampling.evalSPMF_bind_congr_left

@@ -78,19 +78,19 @@ theorem uniformWordAverage_fixedFull_unit_excess_le :
 
 theorem uniformWordAverage_full_price_excess_le :
     uniformWordAverage fixedProposalLength
-      (fun word => terminalCertificatePrice Finset.univ word - (2 ^ 128 : ENNReal)⁻¹) ≤ fullCertificateExcessRate := by
+      (fun word => terminalCertificatePrice Finset.univ word - (2 ^ 144 : ENNReal)⁻¹) ≤ fullCertificateExcessRate := by
   have hscale (word : List Index) :
-      terminalCertificatePrice Finset.univ word - (2 ^ 128 : ENNReal)⁻¹ =
-        (2 ^ 128 : ENNReal)⁻¹ * (fixedFullProposalPrice word - 1) := by
+      terminalCertificatePrice Finset.univ word - (2 ^ 144 : ENNReal)⁻¹ =
+        (2 ^ 144 : ENNReal)⁻¹ * (fixedFullProposalPrice word - 1) := by
     rw [terminalCertificatePrice_full, ENNReal.mul_sub (fun _ _ => by finiteness), mul_one]
   simp_rw [hscale]
   rw [uniformWordAverage_mul_left]
   calc
-    _ ≤ (2 ^ 128 : ENNReal)⁻¹ * (11 / 2 ^ 16 : ENNReal) :=
+    _ ≤ (2 ^ 144 : ENNReal)⁻¹ * (11 / 2 ^ 16 : ENNReal) :=
       mul_le_mul' le_rfl uniformWordAverage_fixedFull_unit_excess_le
-    _ = _ := by
+    _ ≤ _ := by
       rw [fullCertificateExcessRate_def]
-      apply (ENNReal.toReal_eq_toReal_iff' (by finiteness) (by finiteness)).mp
+      apply (ENNReal.toReal_le_toReal (by finiteness) (by finiteness)).mp
       norm_num [ENNReal.toReal_mul, ENNReal.toReal_inv, ENNReal.toReal_div, ENNReal.toReal_pow]
 
 theorem expected_fixedCertificateGame_full_unit_count_le (adversary : Adversary) (q : Nat)
@@ -98,11 +98,11 @@ theorem expected_fixedCertificateGame_full_unit_count_le (adversary : Adversary)
     (hbound : HasHashQueryBound scheme adversary q) :
     (∑' result, Pr[= result | fixedCertificateGame adversary q Finset.univ stopAfter] *
       certificateBankCount result.1.2.2.2.bank) ≤
-        (2 ^ 128 : ENNReal)⁻¹ *
+        (2 ^ 144 : ENNReal)⁻¹ *
           (∑' result, Pr[= result | fixedCertificateGame adversary q Finset.univ stopAfter] *
             result.1.2.2.2.messageCalls) + (q : ENNReal) * fullCertificateExcessRate := by
   apply (expected_fixedCertificateGame_count_le_message_excess adversary q Finset.univ stopAfter
-    hbudget hbound (2 ^ 128 : ENNReal)⁻¹).trans
+    hbudget hbound (2 ^ 144 : ENNReal)⁻¹).trans
   apply add_le_add le_rfl
   exact mul_le_mul' le_rfl uniformWordAverage_full_price_excess_le
 
@@ -113,7 +113,7 @@ theorem expected_certificateCacheGame_full_unit_count_le (adversary : Adversary)
       (fun key input state length record => proposalPrefixStop input state length record ||
         stopAfter key input state length record) false
     (∑' result, Pr[= result | law] * certificateBankCount result.2.2.2.1.bank) ≤
-      (2 ^ 128 : ENNReal)⁻¹ *
+      (2 ^ 144 : ENNReal)⁻¹ *
         (∑' result, Pr[= result | law] * result.2.2.2.1.messageCalls) +
           (q : ENNReal) * fullCertificateExcessRate := by
   dsimp only

@@ -3,8 +3,8 @@ import SigGolfCandidate.SphincsSecurity.Proof.Scheme.Bytes
 
 namespace SphincsSecurity
 
-private theorem parameter_bytes_length (p : PublicParameter) : (bytesLE 16 p).length = 16 :=
-  bytesLE_length 16 p
+private theorem parameter_bytes_length (p : PublicParameter) : (bytesLE 20 p).length = 20 :=
+  bytesLE_length 20 p
 
 private theorem seed_bytes_length (s : MasterSeed) : (bytesLE 32 s).length = 32 :=
   bytesLE_length 32 s

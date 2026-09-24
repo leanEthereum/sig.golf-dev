@@ -140,7 +140,7 @@ theorem forgeAdvantage_le_native_bound_add_histories (dummy : OtsReferenceWords)
     (budget : Nat) (hcost : HasHashQueryBound scheme adversary budget) (hbudget : budget ≤ 2 ^ 127) :
     forgeAdvantage scheme adversary ≤
       ENNReal.ofReal (2 * ((budget : ℝ) / 2 ^ digestBits) - ((budget : ℝ) / 2 ^ digestBits) ^ 2) +
-        (budget : ENNReal) * fullCertificateExcessRate +
+        (budget : ENNReal) * fullCertificateTotalRate +
         (Pr[fun result => result.2.2.1 = true | exceptionHistorySourceGame dummy adversary budget] +
           Pr[fun result => result.2.2.2 = true | exceptionHistorySourceGame dummy adversary budget]) :=
   (forgeAdvantage_le_monitored_bound_add_exception dummy hdummy adversary budget (fun _ _ _ _ => false) hcost hbudget).trans

@@ -34,18 +34,18 @@ theorem encoding_pow_le :
     failMass (fun out => TargetSum.decodeDigest (truncateHash out)) ^ encodingAttemptLimit
       ≤ (2⁻¹ : ℝ≥0∞) ^ (2 ^ 10) := by
   have hroom : failMass (fun out => TargetSum.decodeDigest (truncateHash out))
-      + ((2 ^ 9 : Nat) : ℝ≥0∞)⁻¹ ≤ 1 := by
+      + ((2 ^ 10 : Nat) : ℝ≥0∞)⁻¹ ≤ 1 := by
     have h := failMass_encoding_add_le
     rwa [← Nat.cast_ofNat, ← Nat.cast_pow] at h
-  have hhalf := pow_le_half_ennreal (2 ^ 9) (by positivity) _ hroom
-  rw [show encodingAttemptLimit = 2 ^ 9 * 2 ^ 10 by rw [encodingAttemptLimit]; norm_num, pow_mul]
+  have hhalf := pow_le_half_ennreal (2 ^ 10) (by positivity) _ hroom
+  rw [show encodingAttemptLimit = 2 ^ 10 * 2 ^ 10 by rw [encodingAttemptLimit]; norm_num, pow_mul]
   exact pow_le_pow_left₀ (by positivity) hhalf _
 
-/-- Key generation then signing fails only if one of signing's four searches does. -/
+/-- Key generation then signing fails only if one of signing's six searches does. -/
 theorem probEvent_signedWithKeys_none (seed : MasterSeed) (message : Message) :
     Pr[fun r => r.1.2 = none | (simulateQ (randomOracle : QueryImpl HashSpec _)
       (signedWithKeys seed message)).run ∅]
-      ≤ digestFactor ^ digestAttemptLimit + 5 * encodingBound := by
+      ≤ digestFactor ^ digestAttemptLimit + 6 * encodingBound := by
   rw [signedWithKeys]
   refine probEvent_bind_le _ _ _ ∅ _ (fun r hr => ?_)
   obtain ⟨hrand, hmsg, henc⟩ := keygen_fresh seed r hr message
@@ -57,7 +57,7 @@ theorem probEvent_signedWithKeys_none (seed : MasterSeed) (message : Message) :
     exact probEvent_sign_none r.1.2 message r.2 hrand hmsg henc
 
 theorem failure_le (message : Message) :
-    Pr[= false | experiment message] ≤ digestFactor ^ digestAttemptLimit + 5 * encodingBound := by
+    Pr[= false | experiment message] ≤ digestFactor ^ digestAttemptLimit + 6 * encodingBound := by
   rw [experiment_eq, ← probEvent_eq_eq_probOutput]
   refine probEvent_prob_bind_le _ _ _ _ (fun seed _ => ?_)
   rw [probEvent_map]
@@ -67,7 +67,7 @@ theorem failure_le (message : Message) :
 theorem failure_for_seed_le (seed : MasterSeed) (message : Message) :
     Pr[fun r => r.1 = false |
         (simulateQ (randomOracle : QueryImpl HashSpec _) (honest seed message)).run ∅]
-      ≤ digestFactor ^ digestAttemptLimit + 5 * encodingBound :=
+      ≤ digestFactor ^ digestAttemptLimit + 6 * encodingBound :=
   (probEvent_honest_false_le seed message).trans (probEvent_signedWithKeys_none seed message)
 
 /-- The union-bound input is uniform in the secret seed. -/
@@ -78,12 +78,12 @@ theorem complete_each_seed (seed : MasterSeed) :
       ≤ ((2 ^ 256 : Nat) : ℝ≥0∞)⁻¹ := by
   calc
     _ ≤ ∑' _message : Message,
-        ((2⁻¹ : ℝ≥0∞) ^ (2 ^ 11) + 5 * (2⁻¹ : ℝ≥0∞) ^ (2 ^ 10)) := by
+        ((2⁻¹ : ℝ≥0∞) ^ (2 ^ 11) + 6 * (2⁻¹ : ℝ≥0∞) ^ (2 ^ 10)) := by
           refine ENNReal.tsum_le_tsum fun message => ?_
           exact (failure_for_seed_le seed message).trans
             (add_le_add digestFactor_pow_le (mul_le_mul_right encoding_pow_le _))
     _ = (2 : ℝ≥0∞) ^ 256 *
-        ((2⁻¹ : ℝ≥0∞) ^ (2 ^ 11) + 5 * (2⁻¹ : ℝ≥0∞) ^ (2 ^ 10)) := by
+        ((2⁻¹ : ℝ≥0∞) ^ (2 ^ 11) + 6 * (2⁻¹ : ℝ≥0∞) ^ (2 ^ 10)) := by
           rw [tsum_fintype, Finset.sum_const, nsmul_eq_mul, Finset.card_univ,
             show Fintype.card Message = 2 ^ 256 by simp [messageBits], Nat.cast_pow, Nat.cast_ofNat]
     _ ≤ ((2 ^ 256 : Nat) : ℝ≥0∞)⁻¹ := closing_sum
@@ -93,12 +93,12 @@ theorem complete : SphincsCompletenessStatement := by
   calc
     ∑' message : Message, Pr[= false | experiment message]
         ≤ ∑' _message : Message,
-            ((2⁻¹ : ℝ≥0∞) ^ (2 ^ 11) + 5 * (2⁻¹ : ℝ≥0∞) ^ (2 ^ 10)) := by
+            ((2⁻¹ : ℝ≥0∞) ^ (2 ^ 11) + 6 * (2⁻¹ : ℝ≥0∞) ^ (2 ^ 10)) := by
           refine ENNReal.tsum_le_tsum fun message => ?_
           exact (failure_le message).trans
             (add_le_add digestFactor_pow_le (mul_le_mul_right encoding_pow_le _))
     _ = (2 : ℝ≥0∞) ^ 256 *
-          ((2⁻¹ : ℝ≥0∞) ^ (2 ^ 11) + 5 * (2⁻¹ : ℝ≥0∞) ^ (2 ^ 10)) := by
+          ((2⁻¹ : ℝ≥0∞) ^ (2 ^ 11) + 6 * (2⁻¹ : ℝ≥0∞) ^ (2 ^ 10)) := by
           rw [tsum_fintype, Finset.sum_const, nsmul_eq_mul, Finset.card_univ,
             show Fintype.card Message = 2 ^ 256 by simp [messageBits], Nat.cast_pow, Nat.cast_ofNat]
     _ ≤ ((2 ^ 256 : Nat) : ℝ≥0∞)⁻¹ := closing_sum

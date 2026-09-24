@@ -20,7 +20,7 @@ theorem messageDigestPayload_injective (root : Digest) {leftMessage rightMessage
   simp only [messageDigestPayload] at h
   obtain ⟨hrandomness, hrest⟩ := List.append_inj h (by
     simp only [List.length_append]
-    rw [bytesLE_length 16 leftRandomness, bytesLE_length 16 rightRandomness])
+    rw [bytesLE_length 20 leftRandomness, bytesLE_length 20 rightRandomness])
   have hrandomness' := List.append_cancel_right hrandomness
   exact ⟨bytesLE_injective hrest, bytesLE_injective hrandomness'⟩
 

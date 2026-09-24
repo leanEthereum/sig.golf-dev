@@ -155,25 +155,30 @@ def HypertreeRun (f : QueryImpl HashSpec Id) (cache : QueryCache HashSpec)
     (message target : Digest) : Prop :=
   ∃ bottomLeaf,
     LayerFrame f cache parameter index signature bottomLayer message target bottomLeaf
-      ∧ let middle3Message := foldValue f parameter bottomLayer
+      ∧ let middle4Message := foldValue f parameter bottomLayer
           (treeIndexAt index bottomLayer) (leafIndexAt index bottomLayer)
           (signaturePath signature bottomLayer) bottomLeaf (layerHeight bottomLayer)
-        ∃ middle3Leaf,
-          LayerFrame f cache parameter index signature middle3Layer middle3Message target middle3Leaf
-            ∧ let middle2Message := foldValue f parameter middle3Layer
-                (treeIndexAt index middle3Layer) (leafIndexAt index middle3Layer)
-                (signaturePath signature middle3Layer) middle3Leaf (layerHeight middle3Layer)
-              ∃ middle2Leaf,
-                LayerFrame f cache parameter index signature middle2Layer middle2Message target middle2Leaf
-                  ∧ let middleMessage := foldValue f parameter middle2Layer
-                      (treeIndexAt index middle2Layer) (leafIndexAt index middle2Layer)
-                      (signaturePath signature middle2Layer) middle2Leaf (layerHeight middle2Layer)
-                    ∃ middleLeaf,
-                      LayerFrame f cache parameter index signature middleLayer middleMessage target middleLeaf
-                        ∧ let topMessage := foldValue f parameter middleLayer
-                            (treeIndexAt index middleLayer) (leafIndexAt index middleLayer)
-                            (signaturePath signature middleLayer) middleLeaf (layerHeight middleLayer)
-                          LayerRun f cache parameter index signature topLayer topMessage target
+        ∃ middle4Leaf,
+          LayerFrame f cache parameter index signature middle4Layer middle4Message target middle4Leaf
+            ∧ let middle3Message := foldValue f parameter middle4Layer
+                (treeIndexAt index middle4Layer) (leafIndexAt index middle4Layer)
+                (signaturePath signature middle4Layer) middle4Leaf (layerHeight middle4Layer)
+              ∃ middle3Leaf,
+                LayerFrame f cache parameter index signature middle3Layer middle3Message target middle3Leaf
+                  ∧ let middle2Message := foldValue f parameter middle3Layer
+                      (treeIndexAt index middle3Layer) (leafIndexAt index middle3Layer)
+                      (signaturePath signature middle3Layer) middle3Leaf (layerHeight middle3Layer)
+                    ∃ middle2Leaf,
+                      LayerFrame f cache parameter index signature middle2Layer middle2Message target middle2Leaf
+                        ∧ let middleMessage := foldValue f parameter middle2Layer
+                            (treeIndexAt index middle2Layer) (leafIndexAt index middle2Layer)
+                            (signaturePath signature middle2Layer) middle2Leaf (layerHeight middle2Layer)
+                          ∃ middleLeaf,
+                            LayerFrame f cache parameter index signature middleLayer middleMessage target middleLeaf
+                              ∧ let topMessage := foldValue f parameter middleLayer
+                                  (treeIndexAt index middleLayer) (leafIndexAt index middleLayer)
+                                  (signaturePath signature middleLayer) middleLeaf (layerHeight middleLayer)
+                                LayerRun f cache parameter index signature topLayer topMessage target
 
 theorem hypertreeRun_of_verify (index : Index) (signature : Signature)
     (message target : Digest)
@@ -186,13 +191,21 @@ theorem hypertreeRun_of_verify (index : Index) (signature : Signature)
     message target (by simpa only [numLayers, bottomLayer] using hverify)
     (by simpa only [numLayers, bottomLayer] using hrun)
   obtain ⟨bottomLeaf, hbottom⟩ := hbottom
-  let middle3Message := foldValue f parameter bottomLayer
+  let middle4Message := foldValue f parameter bottomLayer
     (treeIndexAt index bottomLayer) (leafIndexAt index bottomLayer)
     (signaturePath signature bottomLayer) bottomLeaf (layerHeight bottomLayer)
+  have hmiddle4 := layerRun_of_verify (f := f) (cache := cache) index signature middle4Layer
+    middle4Message target (by
+      simpa only [middle4Message, bottomLayer, middle4Layer, numLayers] using hbottom.2.1)
+    (by simpa only [middle4Message, bottomLayer, middle4Layer, numLayers] using hbottom.2.2.2.2)
+  obtain ⟨middle4Leaf, hmiddle4⟩ := hmiddle4
+  let middle3Message := foldValue f parameter middle4Layer
+    (treeIndexAt index middle4Layer) (leafIndexAt index middle4Layer)
+    (signaturePath signature middle4Layer) middle4Leaf (layerHeight middle4Layer)
   have hmiddle3 := layerRun_of_verify (f := f) (cache := cache) index signature middle3Layer
     middle3Message target (by
-      simpa only [middle3Message, bottomLayer, middle3Layer, numLayers] using hbottom.2.1)
-    (by simpa only [middle3Message, bottomLayer, middle3Layer, numLayers] using hbottom.2.2.2.2)
+      simpa only [middle3Message, middle4Layer, middle3Layer, numLayers] using hmiddle4.2.1)
+    (by simpa only [middle3Message, middle4Layer, middle3Layer, numLayers] using hmiddle4.2.2.2.2)
   obtain ⟨middle3Leaf, hmiddle3⟩ := hmiddle3
   let middle2Message := foldValue f parameter middle3Layer
     (treeIndexAt index middle3Layer) (leafIndexAt index middle3Layer)
@@ -216,7 +229,8 @@ theorem hypertreeRun_of_verify (index : Index) (signature : Signature)
   have htop := layerRun_of_verify (f := f) (cache := cache) index signature topLayer
     topMessage target (by simpa only [topMessage, middleLayer, topLayer] using hmiddle.2.1)
     (by simpa only [topMessage, middleLayer, topLayer] using hmiddle.2.2.2.2)
-  exact ⟨bottomLeaf, hbottom, middle3Leaf, hmiddle3, middle2Leaf, hmiddle2, middleLeaf, hmiddle, htop⟩
+  exact ⟨bottomLeaf, hbottom, middle4Leaf, hmiddle4, middle3Leaf, hmiddle3,
+    middle2Leaf, hmiddle2, middleLeaf, hmiddle, htop⟩
 
 def HonestLayerOpening (f : QueryImpl HashSpec Id) (parameter : PublicParameter)
     (otsSecret : Layer → TreeIndex → LeafIndex → ChainIndex → Digest)

@@ -108,18 +108,18 @@ theorem index_eq_of_bottom_position_eq {left right : Index}
   apply Fin.ext
   have htreeVal := congrArg Fin.val htree
   have hleafVal := congrArg Fin.val hleaf
-  have habove : heightAbove bottomLayer = 29 := by decide
-  have hheight : layerHeight bottomLayer = 5 := by decide
-  have hleftTree : (treeIndexAt left bottomLayer).val = left.val / 32 := by
+  have habove : heightAbove bottomLayer = 30 := by decide
+  have hheight : layerHeight bottomLayer = 4 := by decide
+  have hleftTree : (treeIndexAt left bottomLayer).val = left.val / 16 := by
     rw [treeIndexAt_val, habove]
     norm_num [totalHeight]
-  have hrightTree : (treeIndexAt right bottomLayer).val = right.val / 32 := by
+  have hrightTree : (treeIndexAt right bottomLayer).val = right.val / 16 := by
     rw [treeIndexAt_val, habove]
     norm_num [totalHeight]
-  have hleftLeaf : (leafIndexAt left bottomLayer).val = left.val % 32 := by
+  have hleftLeaf : (leafIndexAt left bottomLayer).val = left.val % 16 := by
     rw [leafIndexAt_bottomLayer, hheight]
     norm_num
-  have hrightLeaf : (leafIndexAt right bottomLayer).val = right.val % 32 := by
+  have hrightLeaf : (leafIndexAt right bottomLayer).val = right.val % 16 := by
     rw [leafIndexAt_bottomLayer, hheight]
     norm_num
   rw [hleftTree, hrightTree] at htreeVal
@@ -132,14 +132,15 @@ theorem layerMessage_eq_of_position_eq (secretKey : SecretKey) (left right : Ind
     layerMessage (m := OracleComp HashSpec) secretKey left lay =
       layerMessage secretKey right lay := by
   have hlayer : lay = topLayer ∨ lay = middleLayer ∨ lay = middle2Layer ∨
-      lay = middle3Layer ∨ lay = bottomLayer := by
+      lay = middle3Layer ∨ lay = middle4Layer ∨ lay = bottomLayer := by
     fin_cases lay
     · exact Or.inl (Fin.ext rfl)
     · exact Or.inr (Or.inl (Fin.ext rfl))
     · exact Or.inr (Or.inr (Or.inl (Fin.ext rfl)))
     · exact Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext rfl))))
-    · exact Or.inr (Or.inr (Or.inr (Or.inr (Fin.ext rfl))))
-  rcases hlayer with rfl | rfl | rfl | rfl | rfl
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext rfl)))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Fin.ext rfl)))))
+  rcases hlayer with rfl | rfl | rfl | rfl | rfl | rfl
   · have hnext : treeIndexAt left middleLayer = treeIndexAt right middleLayer := by
       apply Fin.ext
       rw [layers_link_top left, layers_link_top right]
@@ -161,13 +162,20 @@ theorem layerMessage_eq_of_position_eq (secretKey : SecretKey) (left right : Ind
     rw [layerMessage_of_lt secretKey left middle2Layer (by decide),
       layerMessage_of_lt secretKey right middle2Layer (by decide)]
     simp only [show (⟨middle2Layer.val + 1, by decide⟩ : Layer) = middle3Layer from rfl, hnext]
-  · have hnext : treeIndexAt left bottomLayer = treeIndexAt right bottomLayer := by
+  · have hnext : treeIndexAt left middle4Layer = treeIndexAt right middle4Layer := by
       apply Fin.ext
       rw [layers_link_middle3 left, layers_link_middle3 right]
       rw [congrArg Fin.val htree, congrArg Fin.val hleaf]
     rw [layerMessage_of_lt secretKey left middle3Layer (by decide),
       layerMessage_of_lt secretKey right middle3Layer (by decide)]
-    simp only [show (⟨middle3Layer.val + 1, by decide⟩ : Layer) = bottomLayer from rfl, hnext]
+    simp only [show (⟨middle3Layer.val + 1, by decide⟩ : Layer) = middle4Layer from rfl, hnext]
+  · have hnext : treeIndexAt left bottomLayer = treeIndexAt right bottomLayer := by
+      apply Fin.ext
+      rw [layers_link_middle4 left, layers_link_middle4 right]
+      rw [congrArg Fin.val htree, congrArg Fin.val hleaf]
+    rw [layerMessage_of_lt secretKey left middle4Layer (by decide),
+      layerMessage_of_lt secretKey right middle4Layer (by decide)]
+    simp only [show (⟨middle4Layer.val + 1, by decide⟩ : Layer) = bottomLayer from rfl, hnext]
   · have hindex := index_eq_of_bottom_position_eq htree hleaf
     subst right
     rfl

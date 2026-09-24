@@ -24,6 +24,9 @@ def layerMessagePosition (index : Index) (lay : Layer) : Position :=
     .node middle3Layer (treeIndexAt index middle3Layer)
       ⟨layerHeight middle3Layer - 1, by decide⟩ ⟨0, by positivity⟩
   else if lay = middle3Layer then
+    .node middle4Layer (treeIndexAt index middle4Layer)
+      ⟨layerHeight middle4Layer - 1, by decide⟩ ⟨0, by positivity⟩
+  else if lay = middle4Layer then
     .node bottomLayer (treeIndexAt index bottomLayer)
       ⟨layerHeight bottomLayer - 1, by decide⟩ ⟨0, by positivity⟩
   else .ftsRoots index
@@ -38,6 +41,10 @@ private theorem middle2Layer_ne_middleLayer : middle2Layer ≠ middleLayer := by
 private theorem middle3Layer_ne_topLayer : middle3Layer ≠ topLayer := by decide
 private theorem middle3Layer_ne_middleLayer : middle3Layer ≠ middleLayer := by decide
 private theorem middle3Layer_ne_middle2Layer : middle3Layer ≠ middle2Layer := by decide
+private theorem middle4Layer_ne_topLayer : middle4Layer ≠ topLayer := by decide
+private theorem middle4Layer_ne_middleLayer : middle4Layer ≠ middleLayer := by decide
+private theorem middle4Layer_ne_middle2Layer : middle4Layer ≠ middle2Layer := by decide
+private theorem middle4Layer_ne_middle3Layer : middle4Layer ≠ middle3Layer := by decide
 
 private theorem bottomLayer_ne_topLayer : bottomLayer ≠ topLayer := by
   intro h
@@ -51,6 +58,7 @@ private theorem bottomLayer_ne_middleLayer : bottomLayer ≠ middleLayer := by
 
 private theorem bottomLayer_ne_middle2Layer : bottomLayer ≠ middle2Layer := by decide
 private theorem bottomLayer_ne_middle3Layer : bottomLayer ≠ middle3Layer := by decide
+private theorem bottomLayer_ne_middle4Layer : bottomLayer ≠ middle4Layer := by decide
 
 @[simp] theorem layerMessagePosition_top (index : Index) :
     layerMessagePosition index topLayer =
@@ -73,16 +81,24 @@ private theorem bottomLayer_ne_middle3Layer : bottomLayer ≠ middle3Layer := by
 
 @[simp] theorem layerMessagePosition_middle3 (index : Index) :
     layerMessagePosition index middle3Layer =
-      .node bottomLayer (treeIndexAt index bottomLayer)
-        ⟨layerHeight bottomLayer - 1, by decide⟩ ⟨0, by positivity⟩ := by
+      .node middle4Layer (treeIndexAt index middle4Layer)
+        ⟨layerHeight middle4Layer - 1, by decide⟩ ⟨0, by positivity⟩ := by
   rw [layerMessagePosition, if_neg middle3Layer_ne_topLayer,
     if_neg middle3Layer_ne_middleLayer, if_neg middle3Layer_ne_middle2Layer, if_pos rfl]
+
+@[simp] theorem layerMessagePosition_middle4 (index : Index) :
+    layerMessagePosition index middle4Layer =
+      .node bottomLayer (treeIndexAt index bottomLayer)
+        ⟨layerHeight bottomLayer - 1, by decide⟩ ⟨0, by positivity⟩ := by
+  rw [layerMessagePosition, if_neg middle4Layer_ne_topLayer,
+    if_neg middle4Layer_ne_middleLayer, if_neg middle4Layer_ne_middle2Layer,
+    if_neg middle4Layer_ne_middle3Layer, if_pos rfl]
 
 @[simp] theorem layerMessagePosition_bottom (index : Index) :
     layerMessagePosition index bottomLayer = .ftsRoots index := by
   rw [layerMessagePosition, if_neg bottomLayer_ne_topLayer,
     if_neg bottomLayer_ne_middleLayer, if_neg bottomLayer_ne_middle2Layer,
-    if_neg bottomLayer_ne_middle3Layer]
+    if_neg bottomLayer_ne_middle3Layer, if_neg bottomLayer_ne_middle4Layer]
 
 theorem eval_layerMessage_eq_honestValue (f : QueryImpl HashSpec Id)
     (secretKey : SecretKey) (index : Index) (lay : Layer) :
@@ -90,14 +106,15 @@ theorem eval_layerMessage_eq_honestValue (f : QueryImpl HashSpec Id)
       honestValue f secretKey.parameter secretKey.otsSecret secretKey.ftsSecret
         (layerMessagePosition index lay) := by
   have hlayer : lay = topLayer ∨ lay = middleLayer ∨ lay = middle2Layer ∨
-      lay = middle3Layer ∨ lay = bottomLayer := by
+      lay = middle3Layer ∨ lay = middle4Layer ∨ lay = bottomLayer := by
     fin_cases lay
     · exact Or.inl (Fin.ext rfl)
     · exact Or.inr (Or.inl (Fin.ext rfl))
     · exact Or.inr (Or.inr (Or.inl (Fin.ext rfl)))
     · exact Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext rfl))))
-    · exact Or.inr (Or.inr (Or.inr (Or.inr (Fin.ext rfl))))
-  rcases hlayer with rfl | rfl | rfl | rfl | rfl
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inl (Fin.ext rfl)))))
+    · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Fin.ext rfl)))))
+  rcases hlayer with rfl | rfl | rfl | rfl | rfl | rfl
   · rw [layerMessage_of_lt secretKey index topLayer (by decide)]
     rw [layerMessagePosition_top, honestValue_node]
     simp only [show (⟨topLayer.val + 1, by decide⟩ : Layer) = middleLayer from rfl]
@@ -112,7 +129,11 @@ theorem eval_layerMessage_eq_honestValue (f : QueryImpl HashSpec Id)
     rfl
   · rw [layerMessage_of_lt secretKey index middle3Layer (by decide)]
     rw [layerMessagePosition_middle3, honestValue_node]
-    simp only [show (⟨middle3Layer.val + 1, by decide⟩ : Layer) = bottomLayer from rfl]
+    simp only [show (⟨middle3Layer.val + 1, by decide⟩ : Layer) = middle4Layer from rfl]
+    rfl
+  · rw [layerMessage_of_lt secretKey index middle4Layer (by decide)]
+    rw [layerMessagePosition_middle4, honestValue_node]
+    simp only [show (⟨middle4Layer.val + 1, by decide⟩ : Layer) = bottomLayer from rfl]
     rfl
   · rw [layerMessage_bottomLayer secretKey index]
     rw [layerMessagePosition_bottom, honestValue_ftsRoots]

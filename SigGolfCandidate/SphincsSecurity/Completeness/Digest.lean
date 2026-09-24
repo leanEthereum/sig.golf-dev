@@ -10,8 +10,8 @@ Each trial derives a randomizer from a fresh input, then hashes the message with
 digest if its last index group is zero, which a fresh answer does with probability `1/256`. The
 second query need not be fresh: a randomizer can repeat one an earlier trial drew, and then the
 digest is the earlier, rejected one. So the induction carries the set `R` of randomizers drawn so
-far. A trial lands in `R` with probability at most `|R| / 2 ^ 128`, and otherwise its digest query
-is fresh; either way one trial fails with probability at most `255/256 + 2 ^ 32 / 2 ^ 128`.
+far. A trial lands in `R` with probability at most `|R| / 2 ^ 160`, and otherwise its digest query
+is fresh; either way one trial fails with probability at most `255/256 + 2 ^ 32 / 2 ^ 160`.
 -/
 
 open OracleComp OracleSpec ENNReal Finset
@@ -54,9 +54,9 @@ theorem randInput_ne_msgInput (secretKey : Seeded.SecretKey) (message : Message)
     (randomness : Randomness) :
     randInput secretKey message trial ≠ msgInput secretKey message randomness := by
   intro h
-  have h' : fieldBytes ⟨7#8, 0#8, 0#64, BitVec.ofNat 32 trial, 0#32⟩ ++ bytesLE 16 secretKey.parameter
+  have h' : fieldBytes ⟨7#8, 0#8, 0#64, BitVec.ofNat 32 trial, 0#32⟩ ++ bytesLE 20 secretKey.parameter
         ++ (bytesLE 32 secretKey.seed ++ bytesLE 32 message)
-      = fieldBytes (hashDomainFields .message) ++ bytesLE 16 secretKey.parameter
+      = fieldBytes (hashDomainFields .message) ++ bytesLE 20 secretKey.parameter
         ++ messageDigestPayload secretKey.root message randomness := by
     simpa only [randInput, msgInput, randomizerHashInput, tweakableHashInput, tweakBytes,
       List.append_assoc] using h
@@ -97,15 +97,15 @@ theorem tsum_uniform_ite (P : HashOutput → Prop) [DecidablePred P] (x y : ℝ�
   by_cases hu : P u <;> simp [hu, mul_comm]
 
 /-- One trial's failure share. -/
-noncomputable def digestFactor : ℝ≥0∞ := digestReject + (2 : ℝ≥0∞) ^ 32 / (2 : ℝ≥0∞) ^ 128
+noncomputable def digestFactor : ℝ≥0∞ := digestReject + (2 : ℝ≥0∞) ^ 32 / (2 : ℝ≥0∞) ^ 160
 
 theorem probEvent_truncate_mem_le (R : Finset Randomness) (hR : R.card ≤ 2 ^ 32) :
     Pr[fun u : HashOutput => truncateHash u ∈ R | ($ᵗ HashOutput : ProbComp HashOutput)]
-      ≤ (2 : ℝ≥0∞) ^ 32 / (2 : ℝ≥0∞) ^ 128 := by
+      ≤ (2 : ℝ≥0∞) ^ 32 / (2 : ℝ≥0∞) ^ 160 := by
   rw [SphincsSecurity.probEvent_uniform_truncateHash_mem R,
-    show Fintype.card Digest = 2 ^ 128 by simp [digestBits], Nat.cast_pow, Nat.cast_ofNat]
+    show Fintype.card Digest = 2 ^ 160 by simp [digestBits], Nat.cast_pow, Nat.cast_ofNat]
   have hcast : (R.card : ℝ≥0∞) ≤ (2 : ℝ≥0∞) ^ 32 := by exact_mod_cast hR
-  gcongr
+  gcongr <;> norm_num
 
 set_option maxHeartbeats 1000000 in
 /-- The randomizer search exhausts `n` trials with probability at most `digestFactor ^ n`. -/
@@ -189,12 +189,12 @@ theorem probEvent_signDigestLoop (sk : Seeded.SecretKey) (message : Message) :
                 ($ᵗ HashOutput : ProbComp HashOutput)]
               + digestReject * digestFactor ^ n * Pr[fun u : HashOutput => ¬ truncateHash u ∈ R |
                 ($ᵗ HashOutput : ProbComp HashOutput)]
-            ≤ digestFactor ^ n * ((2 : ℝ≥0∞) ^ 32 / (2 : ℝ≥0∞) ^ 128)
+            ≤ digestFactor ^ n * ((2 : ℝ≥0∞) ^ 32 / (2 : ℝ≥0∞) ^ 160)
               + digestReject * digestFactor ^ n * 1 :=
               add_le_add (mul_le_mul_right hcoll _) (mul_le_mul_right probEvent_le_one _)
           _ = digestFactor ^ (n + 1) := by
-              have hF : digestFactor = digestReject + (2 : ℝ≥0∞) ^ 32 / (2 : ℝ≥0∞) ^ 128 := rfl
-              generalize (2 : ℝ≥0∞) ^ 32 / (2 : ℝ≥0∞) ^ 128 = C at hF ⊢
+              have hF : digestFactor = digestReject + (2 : ℝ≥0∞) ^ 32 / (2 : ℝ≥0∞) ^ 160 := rfl
+              generalize (2 : ℝ≥0∞) ^ 32 / (2 : ℝ≥0∞) ^ 160 = C at hF ⊢
               rw [pow_succ, hF]
               ring
 

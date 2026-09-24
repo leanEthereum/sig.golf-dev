@@ -17,7 +17,7 @@ theorem layerMessagePosition_treeBound (index : Index) (lay : Layer) :
     (layerMessagePosition index lay).TreeBound := by
   unfold layerMessagePosition
   split_ifs <;> norm_num [Position.TreeBound, layerHeight, middleLayer, middle2Layer,
-    middle3Layer, bottomLayer, topLayer, numLayers, maxLayerHeight]
+    middle3Layer, middle4Layer, bottomLayer, topLayer, numLayers, maxLayerHeight]
 
 theorem canonicalGraphMessage_eq (key : SecretKey) (f : QueryImpl HashSpec Id) (position : EncodingPosition) :
     canonicalGraphMessage (canonicalGraphLabels key.parameter key.otsSecret key.ftsSecret f) position =

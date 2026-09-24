@@ -152,7 +152,7 @@ theorem originalCertificateSource_full_le_count_add_exception (adversary : Adver
 theorem originalCertificateSource_full_le_message_add_exception (adversary : Adversary) (q : Nat)
     (hbudget : q ≤ 2 ^ 127) (hbound : HasHashQueryBound scheme adversary q) :
     Pr[OriginalFullCertificate | originalCertificateSource adversary] ≤
-      (2 ^ 128 : ENNReal)⁻¹ *
+      (2 ^ 144 : ENNReal)⁻¹ *
         (∑' result, Pr[= result | certificateContextGame adversary q Finset.univ (fun _ => proposalPrefixStop) false] *
           (result.2.2.2.2.1.messageCalls : ENNReal)) + (q : ENNReal) * fullCertificateExcessRate +
       Pr[fun result => CertificateGameExceptional result.2 |
@@ -199,7 +199,7 @@ theorem certificateContextGame_messageCalls_le_original (adversary : Adversary) 
 theorem originalCertificateSource_full_le_original_message_add_exception (adversary : Adversary) (q : Nat)
     (hbudget : q ≤ 2 ^ 127) (hbound : HasHashQueryBound scheme adversary q) :
     Pr[OriginalFullCertificate | originalCertificateSource adversary] ≤
-      (2 ^ 128 : ENNReal)⁻¹ * originalCertificateMessageCost adversary + (q : ENNReal) * fullCertificateExcessRate +
+      (2 ^ 144 : ENNReal)⁻¹ * originalCertificateMessageCost adversary + (q : ENNReal) * fullCertificateExcessRate +
       Pr[fun result => CertificateGameExceptional result.2 |
         certificateContextGame adversary q Finset.univ (fun _ => proposalPrefixStop) false] :=
   (originalCertificateSource_full_le_message_add_exception adversary q hbudget hbound).trans

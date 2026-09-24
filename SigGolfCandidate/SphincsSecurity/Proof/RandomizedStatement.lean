@@ -7,11 +7,11 @@ namespace SphincsSecurity
 
 namespace Concrete
 
-abbrev digestBytes (value : Digest) : HashInput := bytesLE 16 value
+abbrev digestBytes (value : Digest) : HashInput := bytesLE 20 value
 
 abbrev messageBytes (message : Message) : HashInput := bytesLE 32 message
 
-abbrev randomnessBytes (randomness : Randomness) : HashInput := bytesLE 16 randomness
+abbrev randomnessBytes (randomness : Randomness) : HashInput := bytesLE 20 randomness
 
 end Concrete
 

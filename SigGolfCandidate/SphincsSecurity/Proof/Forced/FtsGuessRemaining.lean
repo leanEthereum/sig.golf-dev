@@ -42,7 +42,7 @@ theorem forgeAdvantage_le_nearGuess_small_budget (dummy : OtsReferenceWords)
     (adversary : Adversary) (q : Nat) (hbound : HasHashQueryBound scheme adversary q)
     (hsmall : q ≤ budgetSplit) :
     forgeAdvantage scheme adversary ≤
-      primitiveCoefficient * ((q : ENNReal) / 2 ^ 128) + (q : ENNReal) * fullCertificateExcessRate +
+      primitiveCoefficient * ((q : ENNReal) / 2 ^ 144) + (q : ENNReal) * fullCertificateExcessRate +
       proposalPrefixExceptionBound + FtsGuessHash.pairRate q +
       Pr[ReferenceForgerySample.nearGuess dummy | referenceForgeryGame (canonicalGraphGameInputs adversary)
         (canonicalEncodingInputs_subset_gameInputs adversary) dummy adversary] := by
@@ -55,11 +55,11 @@ theorem forgeAdvantage_le_nearGuess_normalized_small_budget (dummy : OtsReferenc
     (adversary : Adversary) (q : Nat) (hbound : HasHashQueryBound scheme adversary q)
     (hsmall : q ≤ budgetSplit) :
     forgeAdvantage scheme adversary ≤
-      primitiveCoefficient * ((q : ENNReal) / 2 ^ 128) + (q : ENNReal) * fullCertificateExcessRate +
+      primitiveCoefficient * ((q : ENNReal) / 2 ^ 144) + (q : ENNReal) * fullCertificateExcessRate +
       proposalPrefixExceptionBound + ((q : ENNReal) / 2 ^ 128) ^ 2 / (2 * (1 - (q : ENNReal) / 2 ^ 128) ^ 2) +
       Pr[ReferenceForgerySample.nearGuess dummy | referenceForgeryGame (canonicalGraphGameInputs adversary)
         (canonicalEncodingInputs_subset_gameInputs adversary) dummy adversary] :=
   (forgeAdvantage_le_nearGuess_small_budget dummy hdummy adversary q hbound hsmall).trans
-    (add_le_add (add_le_add le_rfl (FtsGuessHash.pairRate_le_normalized q)) le_rfl)
+    (add_le_add (add_le_add le_rfl (FtsGuessHash.pairRate_le_normalized q (hsmall.trans budgetSplit_le))) le_rfl)
 
 end SphincsSecurity.Concrete

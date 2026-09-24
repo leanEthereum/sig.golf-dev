@@ -67,7 +67,7 @@ theorem hashQueryBound_after_derivation (adversary : Adversary) (q : Nat)
 
 theorem hashQueryBound_programmed_from_seeded (adversary : Adversary) (q : Nat)
     (hbound : HasHashQueryBound randomizedScheme adversary q) (seed : MasterSeed)
-    (parameter : PublicParameter) (secret : Secrets) (parameterHigh : Digest) (secretHigh : Secrets) :
+    (parameter : PublicParameter) (secret : Secrets) (parameterHigh : HighDigest) (secretHigh : HighSecrets) :
     HashQueryBound (Concrete.gameAfterSecrets adversary parameter secret.1 secret.2)
       (programmedCache seed parameter secret parameterHigh secretHigh) (q - 1) := by
   have h := (hashQueryBound_after_derivation adversary q hbound seed
@@ -75,7 +75,7 @@ theorem hashQueryBound_programmed_from_seeded (adversary : Adversary) (q : Nat)
   simpa only [programmedCache, truncate_from_halves, tableOts_from_halves, tableFts_from_halves] using h
 
 theorem programmedCache_agreeOutside (seed : MasterSeed) (parameter : PublicParameter)
-    (secret : Secrets) (parameterHigh : Digest) (secretHigh : Secrets) :
+    (secret : Secrets) (parameterHigh : HighDigest) (secretHigh : HighSecrets) :
     AgreeOutside (fun input => SeedHit input seed)
       (programmedCache seed parameter secret parameterHigh secretHigh) ∅ :=
   derivationCache_agreeOutside seed _ _
@@ -86,7 +86,7 @@ theorem hashQueryBound_independent_from_seeded (adversary : Adversary) (q : Nat)
   rw [hasHashQueryBound_iff, Concrete.gameCore_eq_secrets]
   have htail (parameter : PublicParameter) (ots : OtsSecrets) (fts : FtsSecrets) :
       HashQueryBound (Concrete.gameAfterSecrets adversary parameter ots fts) ∅ (q - 1) := by
-    let high : Secrets := (fun _ _ _ _ => 0, fun _ _ _ => 0)
+    let high : HighSecrets := (fun _ _ _ _ => 0, fun _ _ _ => 0)
     exact hashQueryBound_of_seed_caches _ (q - 1) []
       (fun seed => programmedCache seed parameter (ots, fts) 0 high) ∅
       (by simpa using lt_of_le_of_lt (Nat.sub_le q 1) hsmall)

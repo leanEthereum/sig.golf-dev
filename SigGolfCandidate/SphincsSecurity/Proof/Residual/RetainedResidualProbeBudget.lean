@@ -177,6 +177,39 @@ theorem lazyRun_request_probeMessageBound (key : SecretKey)
       exact lazyRun_signingProgram_probeMessageBound inputs words publicReplies selections rows key hencoding message hinputs state
         ha hcovered hbound result hresult
 
+omit parameter hencoding in
+theorem lazyRun_source_probeMessageBound {Result : Type} (key : SecretKey)
+    (hencoding : canonicalEncodingInputs key.parameter ⊆ inputs)
+    (computation : OracleComp (OracleWorld + SigningSpec) Result) (hinputs : sourceInputs key computation ⊆ inputs)
+    (state : State inputs) (ha : ∀ coordinate, (state.candidates coordinate).Nonempty)
+    (hcovered : ResidualByteFrontend.RowsCovered inputs (project state)) (hbound : ProbeMessageBound state.memory)
+    (result : Option Result × State inputs)
+    (hresult : lazyRun (environment key.parameter inputs hencoding words publicReplies selections rows)
+      (simulateQ (adversaryImpl inputs key.parameter key.root words selections) computation) state result ≠ 0) :
+    ProbeMessageBound result.2.memory := by
+  induction computation using OracleComp.inductionOn generalizing state result with
+  | pure value =>
+      simp only [simulateQ_pure, lazyRun, runWith_pure, ne_eq, SPMF.pure_apply_eq_zero_iff, not_not] at hresult
+      subst result
+      exact hbound
+  | query_bind input next ih =>
+      rw [simulateQ_bind, simulateQ_spec_query, lazyRun_bind, RetainedObservation.bind_nonzero] at hresult
+      obtain ⟨middle, hmiddle, hresult⟩ := hresult
+      have hm := lazyRun_request_probeMessageBound inputs words publicReplies selections rows key hencoding input
+        ((requestInputs_subset key input next).trans hinputs) state ha hcovered hbound middle hmiddle
+      have ha' := lazyRun_nonempty (environment key.parameter inputs hencoding words publicReplies selections rows)
+        _ state ha middle hmiddle
+      have hc' := lazyRun_rowsCovered key.parameter inputs hencoding words publicReplies selections rows
+        _ state ha hcovered middle hmiddle
+      rcases middle with ⟨answer, after⟩
+      cases answer with
+      | none =>
+          simp only [Option.elim_none, ne_eq, SPMF.pure_apply_eq_zero_iff, not_not] at hresult
+          subst result
+          exact hm
+      | some answer =>
+          exact ih answer ((sourceInputs_next_subset key input next answer).trans hinputs) after ha' hc' hm result hresult
+
 variable (key : SecretKey) (adversary : Adversary) (encoding : ReferenceEncodingAuxiliary) (dummy : OtsReferenceWords)
   (exposed : InitialPublicLabels (referenceFamilyWords encoding.selections dummy)) (high : CanonicalGraphHighHalves)
   (q : Nat) (required : Finset FtsTree) (stopAfter : CertificateStopRule) (stopped : Bool)

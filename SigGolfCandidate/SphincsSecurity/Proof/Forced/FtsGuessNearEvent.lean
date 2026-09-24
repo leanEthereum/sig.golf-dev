@@ -24,7 +24,7 @@ theorem lazy_original_near_event_le (dummy : OtsReferenceWords) (adversary : Adv
     Pr[fun result => result.2.guesses.Nonempty ∧ completedNearCertificate parameter (canonicalGraphRoot labels) result.1 |
       lazyRun (SecretGuessObservation.environment (originalAnswers dummy adversary parameter otsSecret labels auxiliary))
         (completedRun parameter (canonicalGraphRoot labels) labels adversary) (initialState PUnit.unit)] ≤
-      ((2 ^ 128 - budget : Nat) : ENNReal)⁻¹ *
+      ((2 ^ 160 - budget : Nat) : ENNReal)⁻¹ *
         ∑ slot ∈ Finset.range budget, forcedNearProbability dummy adversary slot parameter otsSecret labels auxiliary := by
   have h := SecretGuessObservation.lazyRun_event_le_forced
     (SecretGuessObservation.environment (originalAnswers dummy adversary parameter otsSecret labels auxiliary))
@@ -35,7 +35,7 @@ theorem lazy_original_near_event_le (dummy : OtsReferenceWords) (adversary : Adv
     (fun result => if completedNearCertificate parameter (canonicalGraphRoot labels) result.1 then 1 else 0)
     (fun _ _ he => ⟨he.1, by rw [if_pos he.2]⟩)
   simpa only [forcedNearProbability, probEvent_eq_tsum_ite, mul_ite, mul_one, mul_zero,
-    show Fintype.card Digest = 2 ^ 128 by simp [digestBits]] using h
+    show Fintype.card Digest = 2 ^ 160 by simp [digestBits]] using h
 
 theorem initial_reference_near_witnesses (parameter : PublicParameter)
     (otsSecret : Layer → TreeIndex → LeafIndex → ChainIndex → Digest) (inputs : Finset HashInput)

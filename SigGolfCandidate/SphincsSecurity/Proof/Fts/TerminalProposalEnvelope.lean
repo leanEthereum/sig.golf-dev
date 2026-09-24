@@ -41,7 +41,7 @@ theorem targetProposalPrefix_length_le (completed total : Nat) (consumed : List 
     _ ≤ targetProposalOverhead * completed + (proposalPrefixSlack : ENNReal) := hprefix
     _ ≤ targetProposalOverhead * signatureLimit + (proposalPrefixSlack : ENNReal) :=
       add_le_add (mul_le_mul' le_rfl (Nat.cast_le.mpr hcompleted)) le_rfl
-    _ ≤ targetProposalOverhead * signatureLimit + (proposalPrefixSlack : ENNReal) + 19 := le_self_add
+    _ ≤ targetProposalOverhead * signatureLimit + (proposalPrefixSlack : ENNReal) + 23 := le_self_add
     _ = (fixedProposalLength : ENNReal) := targetProposalPoolMinimum_eq
     _ ≤ (total : ENNReal) := by exact_mod_cast htotal
 

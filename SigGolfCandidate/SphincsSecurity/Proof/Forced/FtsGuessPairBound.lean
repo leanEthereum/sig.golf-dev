@@ -11,9 +11,9 @@ attribute [local irreducible] canonicalEncodingInputs canonicalGraphInputs canon
   frontierRoot maskOtsPrefixes frontierSigningRun boundaryEval
 
 noncomputable def pairRate (budget : Nat) : ENNReal :=
-  (budget.choose 2 : ENNReal) * ((2 ^ 128 - budget : Nat) : ENNReal)⁻¹ ^ 2
+  (budget.choose 2 : ENNReal) * ((2 ^ 160 - budget : Nat) : ENNReal)⁻¹ ^ 2
 
-theorem pairRate_le_quadratic (budget : Nat) :
+theorem pairRate_le_quadratic (budget : Nat) (hsmall : budget ≤ 2 ^ 127) :
     pairRate budget ≤ (budget : ENNReal) ^ 2 / (2 * ((2 ^ 128 - budget : Nat) : ENNReal) ^ 2) := by
   have hchoose : budget.choose 2 * 2 ≤ budget * budget := by
     rw [Nat.choose_two_right]
@@ -22,14 +22,19 @@ theorem pairRate_le_quadratic (budget : Nat) :
     apply (ENNReal.le_div_iff_mul_le (Or.inl (by norm_num)) (Or.inl (by norm_num))).mpr
     simpa only [pow_two, Nat.cast_mul, Nat.cast_ofNat] using (show ((budget.choose 2 * 2 : Nat) : ENNReal) ≤
       ((budget * budget : Nat) : ENNReal) by exact_mod_cast hchoose)
+  have hden : 2 ^ 128 - budget ≤ 2 ^ 160 - budget := by omega
+  have hinv : ((2 ^ 160 - budget : Nat) : ENNReal)⁻¹ ≤ ((2 ^ 128 - budget : Nat) : ENNReal)⁻¹ := by
+    apply ENNReal.inv_le_inv.mpr
+    exact_mod_cast hden
   calc
-    _ ≤ (budget : ENNReal) ^ 2 / 2 * ((2 ^ 128 - budget : Nat) : ENNReal)⁻¹ ^ 2 := mul_le_mul' hcast le_rfl
+    _ ≤ (budget : ENNReal) ^ 2 / 2 * ((2 ^ 128 - budget : Nat) : ENNReal)⁻¹ ^ 2 :=
+      mul_le_mul' hcast (pow_le_pow_left' hinv 2)
     _ = _ := by
       rw [div_eq_mul_inv, div_eq_mul_inv,
         ENNReal.mul_inv (Or.inl (by norm_num : (2 : ENNReal) ≠ 0)) (Or.inl (by norm_num : (2 : ENNReal) ≠ ⊤)),
         ENNReal.inv_pow, mul_assoc]
 
-theorem pairRate_le_normalized (budget : Nat) :
+theorem pairRate_le_normalized (budget : Nat) (hsmall : budget ≤ 2 ^ 127) :
     pairRate budget ≤ ((budget : ENNReal) / 2 ^ 128) ^ 2 / (2 * (1 - (budget : ENNReal) / 2 ^ 128) ^ 2) := by
   have hsub : 1 - (budget : ENNReal) / 2 ^ 128 = ((2 ^ 128 - budget : Nat) : ENNReal) / 2 ^ 128 := by
     rw [ENNReal.natCast_sub, Nat.cast_pow, Nat.cast_ofNat,
@@ -37,7 +42,7 @@ theorem pairRate_le_normalized (budget : Nat) :
   have hpow (value : ENNReal) : (value / 2 ^ 128) ^ 2 = value ^ 2 * ((2 ^ 128 : ENNReal)⁻¹) ^ 2 := by
     rw [div_eq_mul_inv, mul_pow]
   calc
-    _ ≤ (budget : ENNReal) ^ 2 / (2 * ((2 ^ 128 - budget : Nat) : ENNReal) ^ 2) := pairRate_le_quadratic budget
+    _ ≤ (budget : ENNReal) ^ 2 / (2 * ((2 ^ 128 - budget : Nat) : ENNReal) ^ 2) := pairRate_le_quadratic budget hsmall
     _ = _ := by
       rw [hsub, hpow, hpow, ← mul_assoc]
       exact (ENNReal.mul_div_mul_right _ _ (pow_ne_zero _ (by simp)) (by finiteness)).symm
@@ -55,6 +60,6 @@ theorem lazy_original_two_guesses (dummy : OtsReferenceWords) (adversary : Adver
     (completedRun parameter (canonicalGraphRoot labels) labels adversary) PUnit.unit budget
     (fun result hr => (Nat.le_add_left _ _).trans
       (lazy_original_completedRun_probes dummy adversary budget hbudget parameter otsSecret labels auxiliary hauxiliary result hr))
-  simpa only [pairRate, show Fintype.card Digest = 2 ^ 128 by simp [digestBits]] using hbound
+  simpa only [pairRate, show Fintype.card Digest = 2 ^ 160 by simp [digestBits]] using hbound
 
 end SphincsSecurity.Concrete.FtsGuessHash

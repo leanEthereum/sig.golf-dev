@@ -168,12 +168,13 @@ theorem sign_eq (secretKey : SecretKey) (message : Message) :
 theorem sampleRandomness_eq :
     sampleRandomness = ($ᵗ Randomness : ProbComp Randomness) := rfl
 
-example : ∀ failure : Fin 6,
+example : ∀ failure : Fin 7,
     let result := (sequenceLayers (m := WriterT (List Nat) Id) fun lay =>
       WriterT.mk (pure (if lay.val = failure.val then none else some lay.val, [lay.val]))).run
     (result.2, result.1.map List.ofFn) =
-      ![([4, 3, 2, 1, 0], none), ([4, 3, 2, 1], none), ([4, 3, 2], none),
-        ([4, 3], none), ([4], none), ([4, 3, 2, 1, 0], some [0, 1, 2, 3, 4])] failure := by
+      ![([5, 4, 3, 2, 1, 0], none), ([5, 4, 3, 2, 1], none), ([5, 4, 3, 2], none),
+        ([5, 4, 3], none), ([5, 4], none), ([5], none),
+        ([5, 4, 3, 2, 1, 0], some [0, 1, 2, 3, 4, 5])] failure := by
   decide
 
 /-! ## Parameter arithmetic -/
@@ -181,19 +182,22 @@ example : ∀ failure : Fin 6,
 example : ∑ lay : Layer, layerHeight lay = totalHeight := by decide
 
 example : (layerHeight topLayer, layerHeight middleLayer, layerHeight middle2Layer,
-    layerHeight middle3Layer, layerHeight bottomLayer) = (11, 6, 6, 6, 5) := by
+    layerHeight middle3Layer, layerHeight middle4Layer, layerHeight bottomLayer) =
+      (11, 5, 5, 5, 4, 4) := by
   decide
 
 example : (heightAbove topLayer, heightAbove middleLayer, heightAbove middle2Layer,
-    heightAbove middle3Layer, heightAbove bottomLayer) = (0, 11, 17, 23, 29) := by
+    heightAbove middle3Layer, heightAbove middle4Layer, heightAbove bottomLayer) =
+      (0, 11, 16, 21, 26, 30) := by
   decide
 
 example : (heightBelow topLayer, heightBelow middleLayer, heightBelow middle2Layer,
-    heightBelow middle3Layer, heightBelow bottomLayer) = (23, 17, 11, 5, 0) := by
+    heightBelow middle3Layer, heightBelow middle4Layer, heightBelow bottomLayer) =
+      (23, 18, 13, 8, 4, 0) := by
   decide
 
-/-- The digest is `h + k * a = 202` bits and fits in one oracle output. -/
-example : messageDigestBits = 202 ∧ messageDigestBits ≤ hashOutputBits := by decide
+/-- The digest is `h + k * a = 234` bits and fits in one oracle output. -/
+example : messageDigestBits = 234 ∧ messageDigestBits ≤ hashOutputBits := by decide
 
 theorem treeIndexAt_val (index : Index) (lay : Layer) :
     (treeIndexAt index lay).val = index.val / 2 ^ (totalHeight - heightAbove lay) := rfl
@@ -227,9 +231,9 @@ theorem layers_link_middle (index : Index) :
       = (treeIndexAt index middleLayer).val * 2 ^ layerHeight middleLayer
         + (leafIndexAt index middleLayer).val := by
   have h1 : totalHeight - heightAbove middleLayer = 23 := by decide
-  have h2 : totalHeight - heightAbove middle2Layer = 17 := by decide
-  have hb : heightBelow middleLayer = 17 := by decide
-  have hh : layerHeight middleLayer = 6 := by decide
+  have h2 : totalHeight - heightAbove middle2Layer = 18 := by decide
+  have hb : heightBelow middleLayer = 18 := by decide
+  have hh : layerHeight middleLayer = 5 := by decide
   simp only [treeIndexAt_val, leafIndexAt_val, h1, h2, hb, hh]
   omega
 
@@ -237,21 +241,32 @@ theorem layers_link_middle2 (index : Index) :
     (treeIndexAt index middle3Layer).val
       = (treeIndexAt index middle2Layer).val * 2 ^ layerHeight middle2Layer
         + (leafIndexAt index middle2Layer).val := by
-  have h1 : totalHeight - heightAbove middle2Layer = 17 := by decide
-  have h2 : totalHeight - heightAbove middle3Layer = 11 := by decide
-  have hb : heightBelow middle2Layer = 11 := by decide
-  have hh : layerHeight middle2Layer = 6 := by decide
+  have h1 : totalHeight - heightAbove middle2Layer = 18 := by decide
+  have h2 : totalHeight - heightAbove middle3Layer = 13 := by decide
+  have hb : heightBelow middle2Layer = 13 := by decide
+  have hh : layerHeight middle2Layer = 5 := by decide
   simp only [treeIndexAt_val, leafIndexAt_val, h1, h2, hb, hh]
   omega
 
 theorem layers_link_middle3 (index : Index) :
-    (treeIndexAt index bottomLayer).val
+    (treeIndexAt index middle4Layer).val
       = (treeIndexAt index middle3Layer).val * 2 ^ layerHeight middle3Layer
         + (leafIndexAt index middle3Layer).val := by
-  have h1 : totalHeight - heightAbove middle3Layer = 11 := by decide
-  have h2 : totalHeight - heightAbove bottomLayer = 5 := by decide
-  have hb : heightBelow middle3Layer = 5 := by decide
-  have hh : layerHeight middle3Layer = 6 := by decide
+  have h1 : totalHeight - heightAbove middle3Layer = 13 := by decide
+  have h2 : totalHeight - heightAbove middle4Layer = 8 := by decide
+  have hb : heightBelow middle3Layer = 8 := by decide
+  have hh : layerHeight middle3Layer = 5 := by decide
+  simp only [treeIndexAt_val, leafIndexAt_val, h1, h2, hb, hh]
+  omega
+
+theorem layers_link_middle4 (index : Index) :
+    (treeIndexAt index bottomLayer).val
+      = (treeIndexAt index middle4Layer).val * 2 ^ layerHeight middle4Layer
+        + (leafIndexAt index middle4Layer).val := by
+  have h1 : totalHeight - heightAbove middle4Layer = 8 := by decide
+  have h2 : totalHeight - heightAbove bottomLayer = 4 := by decide
+  have hb : heightBelow middle4Layer = 4 := by decide
+  have hh : layerHeight middle4Layer = 4 := by decide
   simp only [treeIndexAt_val, leafIndexAt_val, h1, h2, hb, hh]
   omega
 

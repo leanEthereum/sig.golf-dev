@@ -126,7 +126,7 @@ theorem initialMonitoredSource_stop_add_strong_le (key : SecretKey) (adversary :
       Pr[MonitoredStrongWin |
         initialMonitoredSource key adversary encoding dummy exposed high budget Finset.univ (proposalStop stopAfter) stopped] ≤
       ENNReal.ofReal (2 * ((budget : ℝ) / 2 ^ digestBits) - ((budget : ℝ) / 2 ^ digestBits) ^ 2) +
-        (budget : ENNReal) * fullCertificateExcessRate +
+        (budget : ENNReal) * fullCertificateTotalRate +
         Pr[MonitoredStrongException |
           initialMonitoredSource key adversary encoding dummy exposed high budget Finset.univ (proposalStop stopAfter) stopped] := by
   have hwin := initialMonitoredSource_strong_le_count_add_exception key adversary encoding hencoding dummy hdummy exposed high hroot

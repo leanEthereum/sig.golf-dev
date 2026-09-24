@@ -1,6 +1,8 @@
 import SigGolfCandidate.SphincsSecurity.Proof.Base.Prelude
 import SigGolfCandidate.SphincsSecurity.Proof.Reference.BoundaryHashCost
 
+set_option maxHeartbeats 2000000
+
 /-! ## AuthenticationQueryCost -/
 
 namespace SphincsSecurity.Concrete
@@ -116,10 +118,12 @@ theorem boundaryEval_sequenceFin {α : Type} {n : Nat} (parameter : PublicParame
 
 def sequenceLayersHashCost {α : Type} (layers : Layer → Option α × Nat) : Nat :=
   (layers bottomLayer).2 + if (layers bottomLayer).1.isSome then
-    (layers middle3Layer).2 + if (layers middle3Layer).1.isSome then
-      (layers middle2Layer).2 + if (layers middle2Layer).1.isSome then
-        (layers middleLayer).2 + if (layers middleLayer).1.isSome then
-          (layers topLayer).2 else 0
+    (layers middle4Layer).2 + if (layers middle4Layer).1.isSome then
+      (layers middle3Layer).2 + if (layers middle3Layer).1.isSome then
+        (layers middle2Layer).2 + if (layers middle2Layer).1.isSome then
+          (layers middleLayer).2 + if (layers middleLayer).1.isSome then
+            (layers topLayer).2 else 0
+        else 0
       else 0
     else 0
   else 0
@@ -136,11 +140,12 @@ theorem boundaryEval_sequenceLayers {α : Type} (parameter : PublicParameter)
     rw [← boundaryEval_fst parameter f, hlayers]
   apply boundaryEval_eq_of_snd
   cases hb : (layers bottomLayer).1 <;>
+    cases hm4 : (layers middle4Layer).1 <;>
     cases hm3 : (layers middle3Layer).1 <;>
     cases hm2 : (layers middle2Layer).1 <;>
     cases hm : (layers middleLayer).1 <;>
     cases ht : (layers topLayer).1 <;>
-    simp [sequenceLayers, boundaryEval_bind, hvalues, hlayers, hb, hm3, hm2, hm, ht,
+    simp [sequenceLayers, boundaryEval_bind, hvalues, hlayers, hb, hm4, hm3, hm2, hm, ht,
       sequenceLayersHashCost, pow_add]
 
 theorem boundaryEval_chainWalk (parameter : PublicParameter) (f : QueryImpl HashSpec Id)

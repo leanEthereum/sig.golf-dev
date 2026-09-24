@@ -8,7 +8,7 @@ attribute [local irreducible] instFintypePosition
 set_option backward.isDefEq.respectTransparency false
 
 abbrev CanonicalCoordinateLabels := CanonicalCoordinate → Digest
-abbrev CanonicalGraphHighHalves := Position → Digest
+abbrev CanonicalGraphHighHalves := Position → BitVec (hashOutputBits - digestBits)
 abbrev CanonicalSecretGraph :=
   (Layer → TreeIndex → LeafIndex → ChainIndex → Digest) ×
     (Index → FtsTree → FtsLeaf → Digest) × CanonicalGraphLabels
@@ -21,7 +21,7 @@ def coordinateOtsSecrets (labels : CanonicalCoordinateLabels) : Layer → TreeIn
 def coordinateFtsSecrets (labels : CanonicalCoordinateLabels) : Index → FtsTree → FtsLeaf → Digest :=
   fun index tree leaf => labels (.ftsStart index tree leaf)
 
-noncomputable def digestHashHalves : HashOutput ≃ Digest × Digest :=
+noncomputable def digestHashHalves : HashOutput ≃ Digest × BitVec (hashOutputBits - digestBits) :=
   splitHashOutputEquiv digestBits (by decide)
 
 def canonicalGraphHighHalves (graph : CanonicalGraphLabels) : CanonicalGraphHighHalves :=

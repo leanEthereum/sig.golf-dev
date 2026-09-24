@@ -19,14 +19,14 @@ namespace SphincsSecurity.Completeness
 
 open Concrete
 
-private theorem parameter_bytes_length (p : PublicParameter) : (bytesLE 16 p).length = 16 :=
-  bytesLE_length 16 p
+private theorem parameter_bytes_length (p : PublicParameter) : (bytesLE 20 p).length = 20 :=
+  bytesLE_length 20 p
 
 /-- Two hash inputs whose tweak fields differ in the tag differ, whatever their payloads. -/
 theorem fieldInput_ne_of_tag_ne (parameter : PublicParameter) {fields1 fields2 : TweakFields}
     (htag : fields1.tag ≠ fields2.tag) (payload1 payload2 : HashInput) :
-    fieldBytes fields1 ++ bytesLE 16 parameter ++ payload1
-      ≠ fieldBytes fields2 ++ bytesLE 16 parameter ++ payload2 := by
+    fieldBytes fields1 ++ bytesLE 20 parameter ++ payload1
+      ≠ fieldBytes fields2 ++ bytesLE 20 parameter ++ payload2 := by
   intro h
   apply htag
   obtain ⟨hprefix, _⟩ := List.append_inj h (by
@@ -49,8 +49,8 @@ theorem tweakableHashInput_ne_of_tag_ne (parameter : PublicParameter) {d1 d2 : H
 /-- The tag byte precedes the parameter, so inputs under different tags differ even across parameters. -/
 theorem fieldInput_ne_of_tag_ne' (parameter parameter' : PublicParameter)
     {fields1 fields2 : TweakFields} (htag : fields1.tag ≠ fields2.tag) (payload1 payload2 : HashInput) :
-    fieldBytes fields1 ++ bytesLE 16 parameter ++ payload1
-      ≠ fieldBytes fields2 ++ bytesLE 16 parameter' ++ payload2 := by
+    fieldBytes fields1 ++ bytesLE 20 parameter ++ payload1
+      ≠ fieldBytes fields2 ++ bytesLE 20 parameter' ++ payload2 := by
   intro h
   apply htag
   obtain ⟨hprefix, _⟩ := List.append_inj h (by simp [fieldBytes, parameter_bytes_length, bytesLE_length])

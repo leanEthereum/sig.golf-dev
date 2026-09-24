@@ -146,10 +146,10 @@ theorem digestBytes_injective {x y : Digest} (h : Concrete.digestBytes x = Concr
     x = y :=
   bytesLE_injective h
 
-theorem digestBytes_length (x : Digest) : (Concrete.digestBytes x).length = 16 :=
+theorem digestBytes_length (x : Digest) : (Concrete.digestBytes x).length = 20 :=
   by
-    change (bytesLE 16 x).length = 16
-    exact bytesLE_length 16 x
+    change (bytesLE 20 x).length = 20
+    exact bytesLE_length 20 x
 
 theorem nodePayload_injective {left right left' right' : Digest}
     (h : Concrete.nodePayload left right = Concrete.nodePayload left' right') :
@@ -182,13 +182,13 @@ theorem flatMap_ofFn_injective {α β : Type} (g : α → List β) (len : Nat)
 theorem leafPayload_injective {endpoints endpoints' : ChainIndex → Digest}
     (h : Concrete.leafPayload endpoints = Concrete.leafPayload endpoints') :
     endpoints = endpoints' :=
-  flatMap_ofFn_injective Concrete.digestBytes 16 digestBytes_length
+  flatMap_ofFn_injective Concrete.digestBytes 20 digestBytes_length
     (fun _ _ => digestBytes_injective) h
 
 /-- A few-time public key's payload is its `k - 1` roots. -/
 theorem ftsRootsPayload_injective {roots roots' : FtsTree → Digest}
     (h : Concrete.ftsRootsPayload roots = Concrete.ftsRootsPayload roots') : roots = roots' :=
-  flatMap_ofFn_injective Concrete.digestBytes 16 digestBytes_length
+  flatMap_ofFn_injective Concrete.digestBytes 20 digestBytes_length
     (fun _ _ => digestBytes_injective) h
 
 end SphincsSecurity

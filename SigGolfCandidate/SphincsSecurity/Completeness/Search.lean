@@ -188,7 +188,7 @@ theorem otsSignFrom_eq_searchLoop (parameter : PublicParameter) (lay : Layer) (t
         : OracleComp HashSpec (Option (Counter × (ChainIndex → Digest))))
         = searchLoop
             (fun c => tweakableHashInput parameter (.encoding lay tree leaf)
-              (bytesLE 16 message ++ Concrete.counterBytes (BitVec.ofNat counterBits c)))
+              (bytesLE 20 message ++ Concrete.counterBytes (BitVec.ofNat counterBits c)))
             (fun out => TargetSum.decodeDigest (truncateHash out))
             (fun c encoding => do
               let values ← sequenceFin fun chainIdx => do

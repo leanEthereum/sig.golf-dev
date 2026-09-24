@@ -18,6 +18,7 @@ computations, `sequenceFin` fixing one.
 namespace SphincsSecurity.Concrete
 
 open OracleComp
+set_option maxHeartbeats 2000000
 
 variable {α : Type} (f : QueryImpl HashSpec Id)
 
@@ -37,12 +38,14 @@ theorem evalWithAnswerFn_sequenceLayers (computation : Layer → OracleComp Hash
     evalWithAnswerFn f (sequenceLayers computation) =
       sequenceFin (m := Option) (fun lay => evalWithAnswerFn f (computation lay)) := by
   cases hb : evalWithAnswerFn f (computation bottomLayer) <;>
+    cases hm4 : evalWithAnswerFn f (computation middle4Layer) <;>
     cases hm3 : evalWithAnswerFn f (computation middle3Layer) <;>
     cases hm2 : evalWithAnswerFn f (computation middle2Layer) <;>
     cases hm : evalWithAnswerFn f (computation middleLayer) <;>
     cases ht : evalWithAnswerFn f (computation topLayer) <;>
     simp [sequenceLayers, sequenceFin, evalWithAnswerFn_bind,
-      bottomLayer, middle3Layer, middle2Layer, middleLayer, topLayer, numLayers] at hb hm3 hm2 hm ht ⊢ <;>
-    simp [hb, hm3, hm2, hm, ht] <;> rfl
+      bottomLayer, middle4Layer, middle3Layer, middle2Layer, middleLayer, topLayer,
+      numLayers] at hb hm4 hm3 hm2 hm ht ⊢ <;>
+    simp [hb, hm4, hm3, hm2, hm, ht] <;> rfl
 
 end SphincsSecurity.Concrete

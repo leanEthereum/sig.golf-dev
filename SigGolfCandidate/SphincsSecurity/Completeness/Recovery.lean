@@ -558,30 +558,35 @@ theorem sequenceLayers_spec {α : Layer → Type}
   | none => simp [hb] at h
   | some bottom =>
       simp only [hb, evalWithAnswerFn_bind] at h
-      cases hm3 : evalWithAnswerFn f (computation middle3Layer) with
-      | none => simp [hm3] at h
-      | some middle3 =>
-          simp only [hm3, evalWithAnswerFn_bind] at h
-          cases hm2 : evalWithAnswerFn f (computation middle2Layer) with
-          | none => simp [hm2] at h
-          | some middle2 =>
-              simp only [hm2, evalWithAnswerFn_bind] at h
-              cases hm : evalWithAnswerFn f (computation middleLayer) with
-              | none => simp [hm] at h
-              | some middle =>
-                  simp only [hm, evalWithAnswerFn_bind] at h
-                  cases ht : evalWithAnswerFn f (computation topLayer) with
-                  | none => simp [ht] at h
-                  | some top =>
-                      simp only [ht, evalWithAnswerFn_pure, Option.some.injEq] at h
-                      cases h
-                      intro lay
-                      fin_cases lay
-                      · exact ht
-                      · exact hm
-                      · exact hm2
-                      · exact hm3
-                      · exact hb
+      cases hm4 : evalWithAnswerFn f (computation middle4Layer) with
+      | none => simp [hm4] at h
+      | some middle4 =>
+          simp only [hm4, evalWithAnswerFn_bind] at h
+          cases hm3 : evalWithAnswerFn f (computation middle3Layer) with
+          | none => simp [hm3] at h
+          | some middle3 =>
+              simp only [hm3, evalWithAnswerFn_bind] at h
+              cases hm2 : evalWithAnswerFn f (computation middle2Layer) with
+              | none => simp [hm2] at h
+              | some middle2 =>
+                  simp only [hm2, evalWithAnswerFn_bind] at h
+                  cases hm : evalWithAnswerFn f (computation middleLayer) with
+                  | none => simp [hm] at h
+                  | some middle =>
+                      simp only [hm, evalWithAnswerFn_bind] at h
+                      cases ht : evalWithAnswerFn f (computation topLayer) with
+                      | none => simp [ht] at h
+                      | some top =>
+                          simp only [ht, evalWithAnswerFn_pure, Option.some.injEq] at h
+                          cases h
+                          intro lay
+                          fin_cases lay
+                          · exact ht
+                          · exact hm
+                          · exact hm2
+                          · exact hm3
+                          · exact hm4
+                          · exact hb
 
 -- Below, only the shape of `sign` matters, never the trees it walks; sealing them keeps the
 -- unfolding shallow.
@@ -637,8 +642,8 @@ theorem verify_of_sign (secretKey : Seeded.SecretKey) (message : Message) {signa
   have hbottom : enterMessage f secretKey index numLayers
       = evalWithAnswerFn f (Seeded.ftsKey secretKey.parameter index secretKey.seed
         : OracleComp HashSpec Digest) := by
-    rw [show numLayers = 4 + 1 from rfl, enterMessage, dif_pos (by decide : 4 < numLayers),
-      layerMessageValue, Seeded.layerMessage, dif_neg (by decide : ¬ 4 + 1 < numLayers)]
+    rw [show numLayers = 5 + 1 from rfl, enterMessage, dif_pos (by decide : 5 < numLayers),
+      layerMessageValue, Seeded.layerMessage, dif_neg (by decide : ¬ 5 + 1 < numLayers)]
   have hkey : evalWithAnswerFn f (ftsRecover secretKey.parameter index (digestLeaves digest)
       signature.ftsSecret signature.ftsPath : OracleComp HashSpec Digest)
       = enterMessage f secretKey index numLayers := by

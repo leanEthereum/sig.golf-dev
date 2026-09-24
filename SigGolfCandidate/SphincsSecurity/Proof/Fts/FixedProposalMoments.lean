@@ -6,7 +6,7 @@ namespace SphincsSecurity.Concrete
 open ENNReal
 
 noncomputable def fixedFullProposalPrice (word : List Index) : ENNReal :=
-  (2 ^ 74 : ENNReal)⁻¹ * proposalPowerSum 20 word
+  (2 ^ 90 : ENNReal)⁻¹ * proposalPowerSum 24 word
 
 theorem fixedProposalLength_rate_le :
     (fixedProposalLength : ENNReal) * (Fintype.card Index : ENNReal)⁻¹ ≤ 19 / 50 := by
@@ -25,13 +25,13 @@ theorem uniformWordAverage_fixedFull_mean_le :
     uniformWordAverage fixedProposalLength fixedFullProposalPrice ≤ 1 / 5 := by
   unfold fixedFullProposalPrice
   rw [uniformWordAverage_mul_left]
-  have h := mul_le_mul' (a := (2 ^ 74 : ENNReal)⁻¹) le_rfl
-    (uniformWordAverage_powerSum_le (α := Index) fixedProposalLength 20 (19 / 50) fixedProposalLength_rate_le)
+  have h := mul_le_mul' (a := (2 ^ 90 : ENNReal)⁻¹) le_rfl
+    (uniformWordAverage_powerSum_le (α := Index) fixedProposalLength 24 (19 / 50) fixedProposalLength_rate_le)
   have hcard : Fintype.card Index = 2 ^ 34 := Fintype.card_fin _
   rw [hcard] at h
   apply h.trans
   calc
-    _ = (2 ^ 34 : ENNReal) * (2 ^ 74 : ENNReal)⁻¹ * stirlingPowerMoment (19 / 50) 20 := by
+    _ = (2 ^ 34 : ENNReal) * (2 ^ 90 : ENNReal)⁻¹ * stirlingPowerMoment (19 / 50) 24 := by
       push_cast
       ring
     _ ≤ _ := stirlingPowerMoment_full_mean_le
@@ -41,17 +41,17 @@ theorem uniformWordAverage_fixedFull_secondMoment_le :
       uniformWordAverage fixedProposalLength fixedFullProposalPrice ^ 2 + 13 / 25000 := by
   unfold fixedFullProposalPrice
   simp only [mul_pow, uniformWordAverage_mul_left]
-  have h := mul_le_mul' (a := ((2 ^ 74 : ENNReal)⁻¹) ^ 2) le_rfl
-    (uniformWordAverage_powerSum_square_le (α := Index) fixedProposalLength 20 (19 / 50) fixedProposalLength_rate_le)
+  have h := mul_le_mul' (a := ((2 ^ 90 : ENNReal)⁻¹) ^ 2) le_rfl
+    (uniformWordAverage_powerSum_square_le (α := Index) fixedProposalLength 24 (19 / 50) fixedProposalLength_rate_le)
   have hcard : Fintype.card Index = 2 ^ 34 := Fintype.card_fin _
   rw [hcard, mul_add] at h
   apply h.trans
   apply add_le_add le_rfl
-  have hscale : ((2 ^ 74 : ENNReal)⁻¹) ^ 2 = (2 ^ 148 : ENNReal)⁻¹ := by
+  have hscale : ((2 ^ 90 : ENNReal)⁻¹) ^ 2 = (2 ^ 180 : ENNReal)⁻¹ := by
     rw [← ENNReal.inv_pow, ← pow_mul]
   rw [hscale]
   calc
-    _ = (2 ^ 34 : ENNReal) * (2 ^ 148 : ENNReal)⁻¹ * stirlingPowerMoment (19 / 50) 40 := by
+    _ = (2 ^ 34 : ENNReal) * (2 ^ 180 : ENNReal)⁻¹ * stirlingPowerMoment (19 / 50) 48 := by
       push_cast
       ring
     _ ≤ _ := stirlingPowerMoment_full_variance_le

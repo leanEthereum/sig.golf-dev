@@ -147,7 +147,7 @@ theorem original_primitive_add_full_certificate_small_budget (dummy : OtsReferen
     Pr[GraphPrimitiveEvent dummy | referenceGraphContextGame contactObserver (canonicalGraphGameInputs adversary)
       (canonicalEncodingInputs_subset_gameInputs adversary) dummy adversary] +
       Pr[OriginalFullCertificate | originalCertificateSource adversary] ≤
-      primitiveCoefficient * ((q : ENNReal) / 2 ^ 128) + (q : ENNReal) * fullCertificateExcessRate +
+      primitiveCoefficient * ((q : ENNReal) / 2 ^ 144) + (q : ENNReal) * fullCertificateExcessRate +
       proposalPrefixExceptionBound :=
   (original_primitive_add_full_certificate_le_small_budget_add_prefix dummy adversary q hbound hsmall).trans
     (add_le_add le_rfl (certificateContextGame_prefix_le adversary q Finset.univ (fun _ => proposalPrefixStop) false))

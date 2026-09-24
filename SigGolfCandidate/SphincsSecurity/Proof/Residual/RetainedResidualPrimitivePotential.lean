@@ -11,6 +11,7 @@ open InterleavedResidual (Routing SigningRecord)
 attribute [local instance] Classical.propDecidable
 attribute [local irreducible] hashInputs sourceInputs canonicalEncodingInputs canonicalGraphInputs instFintypePosition
 set_option backward.isDefEq.respectTransparency false
+set_option maxHeartbeats 0
 
 noncomputable def primitiveContinuation (budget : Nat) (memory : Memory) : ENNReal :=
   ENNReal.ofReal (PrimitiveMessagePotential.value (2 ^ digestBits) memory.external.probes
@@ -520,6 +521,57 @@ theorem initialMonitoredSource_joint_primitive_messages (key : SecretKey) (adver
   exact h
 
 omit parameter inputs hencoding words publicReplies selections rows in
+theorem initialMonitoredSource_messageCalls_le (key : SecretKey) (adversary : Adversary)
+    (encoding : ReferenceEncodingAuxiliary) (dummy : OtsReferenceWords)
+    (exposed : InitialPublicLabels (referenceFamilyWords encoding.selections dummy)) (high : CanonicalGraphHighHalves)
+    (budget : Nat) (stopAfter : CertificateStopRule) (stopped : Bool)
+    (hparameter : key.parameter ∈ support sampleParameter)
+    (hencoding : encoding ∈ referenceEncodingAuxiliarySample.support)
+    (hroot : key.root = knownRoot (initialKnown (referenceFamilyWords encoding.selections dummy) exposed))
+    (hcost : HasHashQueryBound scheme adversary budget) :
+    (∑' result, Pr[= result |
+      initialMonitoredSource key adversary encoding dummy exposed high budget Finset.univ (proposalStop stopAfter) stopped] *
+        (result.2.1.memory.messageCalls.length : ENNReal)) ≤ budget := by
+  let inputs := gameInputs adversary
+  let words := referenceFamilyWords encoding.selections dummy
+  let publicReplies := coordinateGraphLabels (initialKnown words exposed) high
+  let source := FtsProbeSimulation.unloggedRetainedRestComputation adversary ⟨key.root, key.parameter⟩
+  let initial := initialState inputs words exposed
+  let law := initialMonitoredSource key adversary encoding dummy exposed high budget Finset.univ (proposalStop stopAfter) stopped
+  let native := lazyRun (environment key.parameter inputs
+    (canonicalEncodingInputs_subset_retainedGameInputs adversary key.parameter) words publicReplies
+    encoding.selections encoding.rows)
+    (simulateQ (adversaryImpl inputs key.parameter key.root words encoding.selections) source) initial
+  have herasure : (fun result => (result.1, result.2.1)) <$> law = native := by
+    exact monitoredRun_erasure key inputs (canonicalEncodingInputs_subset_retainedGameInputs adversary key.parameter)
+      words publicReplies encoding.selections encoding.rows budget Finset.univ (proposalStop stopAfter) source
+      (initial, initialCertificateMonitor keygenHashCost stopped)
+  have hlength (result : Option (Forgery × Bool) × MonitoredState inputs) (hr : law result ≠ 0) :
+      result.2.1.memory.messageCalls.length ≤ budget := by
+    have hnative := map_nonzero law (fun result => (result.1, result.2.1)) result hr
+    rw [herasure] at hnative
+    have hresources := lazyRun_source_probeMessageBound inputs words publicReplies encoding.selections
+      encoding.rows key (canonicalEncodingInputs_subset_retainedGameInputs adversary key.parameter) source
+      (sourceInputs_unlogged_subset_gameInputs adversary key) initial
+      (initialAllowed_nonempty words exposed) (initialState_rowsCovered inputs words exposed)
+      (by exact Nat.zero_le _) (result.1, result.2.1) hnative
+    have hbudget := initialMonitoredSource_hashCalls_le key adversary encoding dummy exposed high budget
+      Finset.univ (proposalStop stopAfter) stopped hparameter hencoding hroot hcost result hr
+    change result.2.1.memory.external.probes + result.2.1.memory.messageCalls.length ≤
+      result.2.1.memory.external.hashCalls at hresources
+    omega
+  calc
+    _ ≤ ∑' result, Pr[= result | law] * (budget : ENNReal) := by
+      apply ENNReal.tsum_le_tsum
+      intro result
+      by_cases hr : result ∈ support law
+      · exact mul_le_mul' le_rfl (Nat.cast_le.mpr (hlength result ((mem_support_iff _ _).mp hr)))
+      · rw [probOutput_eq_zero_of_not_mem_support hr, zero_mul, zero_mul]
+    _ ≤ budget := by
+      rw [ENNReal.tsum_mul_right]
+      exact mul_le_of_le_one_left' tsum_probOutput_le_one
+
+omit parameter inputs hencoding words publicReplies selections rows in
 theorem initialMonitoredSource_primitive_add_full_count_le (key : SecretKey) (adversary : Adversary)
     (encoding : ReferenceEncodingAuxiliary) (dummy : OtsReferenceWords)
     (exposed : InitialPublicLabels (referenceFamilyWords encoding.selections dummy)) (high : CanonicalGraphHighHalves)
@@ -534,21 +586,31 @@ theorem initialMonitoredSource_primitive_add_full_count_le (key : SecretKey) (ad
         initialMonitoredSource key adversary encoding dummy exposed high budget Finset.univ (proposalStop stopAfter) stopped] *
           certificateBankCount result.2.2.bank) ≤
       ENNReal.ofReal (2 * ((budget : ℝ) / 2 ^ digestBits) - ((budget : ℝ) / 2 ^ digestBits) ^ 2) +
-        (budget : ENNReal) * fullCertificateExcessRate := by
+        (budget : ENNReal) * fullCertificateTotalRate := by
   let law := initialMonitoredSource key adversary encoding dummy exposed high budget Finset.univ (proposalStop stopAfter) stopped
   let messages : ENNReal := ∑' result, Pr[= result | law] * (result.2.1.memory.messageCalls.length : ENNReal)
   have hprimitive := initialMonitoredSource_joint_primitive_messages key adversary encoding dummy exposed high budget Finset.univ
     (proposalStop stopAfter) stopped hparameter hencoding hroot hcost hbudget
   have hcoverage := expected_initialMonitoredSource_full_unit_count_le key adversary encoding dummy exposed high budget
     stopAfter stopped hparameter hencoding hroot hcost hbudget
+  have hmessages := initialMonitoredSource_messageCalls_le key adversary encoding dummy exposed high budget
+    stopAfter stopped hparameter hencoding hroot hcost
+  have hprimary : Pr[fun result => result.1 = none | law] ≤
+      ENNReal.ofReal (2 * ((budget : ℝ) / 2 ^ digestBits) - ((budget : ℝ) / 2 ^ digestBits) ^ 2) :=
+    (le_self_add).trans hprimitive
+  have hmessageRate : messages / 2 ^ 144 ≤ (budget : ENNReal) / 2 ^ 144 := by
+    simpa only [div_eq_mul_inv] using mul_le_mul' hmessages (le_refl ((2 ^ 144 : ENNReal)⁻¹))
   calc
     _ ≤ Pr[fun result => result.1 = none | law] +
-        ((2 ^ 128 : ENNReal)⁻¹ * messages + (budget : ENNReal) * fullCertificateExcessRate) :=
+        ((2 ^ 144 : ENNReal)⁻¹ * messages + (budget : ENNReal) * fullCertificateExcessRate) :=
       add_le_add le_rfl hcoverage
-    _ = (Pr[fun result => result.1 = none | law] + messages / 2 ^ digestBits) +
-        (budget : ENNReal) * fullCertificateExcessRate := by
-      simp only [div_eq_mul_inv, digestBits]
-      rw [mul_comm (2 ^ 128 : ENNReal)⁻¹ messages, ← add_assoc]
-    _ ≤ _ := add_le_add hprimitive le_rfl
+    _ = Pr[fun result => result.1 = none | law] +
+        (messages / 2 ^ 144 + (budget : ENNReal) * fullCertificateExcessRate) := by
+      rw [div_eq_mul_inv, mul_comm (2 ^ 144 : ENNReal)⁻¹ messages]
+    _ ≤ ENNReal.ofReal (2 * ((budget : ℝ) / 2 ^ digestBits) - ((budget : ℝ) / 2 ^ digestBits) ^ 2) +
+        (budget : ENNReal) / 2 ^ 144 + (budget : ENNReal) * fullCertificateExcessRate := by
+      simpa only [add_assoc] using add_le_add hprimary (add_le_add hmessageRate le_rfl)
+    _ = _ := by
+      simp only [fullCertificateTotalRate_def, div_eq_mul_inv, mul_add, add_assoc]
 
 end SphincsSecurity.Concrete.RetainedResidual

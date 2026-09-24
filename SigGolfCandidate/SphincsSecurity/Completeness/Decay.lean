@@ -88,35 +88,35 @@ theorem two_pow_div_two_pow (j k : Nat) :
 
 /-- A per-trial rejection share of `1 - 2⁻⁸` plus the randomizer-collision share still leaves room for `2⁻⁹`. -/
 theorem digest_room (x : ENNReal) (hx : x + (256 : ENNReal)⁻¹ = 1) :
-    x + (2 : ENNReal) ^ 32 / (2 : ENNReal) ^ 128 + ((2 ^ 9 : Nat) : ENNReal)⁻¹ ≤ 1 := by
-  have hcoll : (2 : ENNReal) ^ 32 / (2 : ENNReal) ^ 128 = (2⁻¹ : ENNReal) ^ 96 := by
-    rw [show (128 : Nat) = 32 + 96 from rfl, two_pow_div_two_pow]
+    x + (2 : ENNReal) ^ 32 / (2 : ENNReal) ^ 160 + ((2 ^ 9 : Nat) : ENNReal)⁻¹ ≤ 1 := by
+  have hcoll : (2 : ENNReal) ^ 32 / (2 : ENNReal) ^ 160 = (2⁻¹ : ENNReal) ^ 128 := by
+    rw [show (160 : Nat) = 32 + 128 from rfl, two_pow_div_two_pow]
   have h9 : ((2 ^ 9 : Nat) : ENNReal)⁻¹ = (2⁻¹ : ENNReal) ^ 9 := by
     rw [Nat.cast_pow, Nat.cast_ofNat, ENNReal.inv_pow]
   have h8 : (256 : ENNReal)⁻¹ = (2⁻¹ : ENNReal) ^ 8 := by
     rw [show (256 : ENNReal) = 2 ^ 8 by norm_num, ENNReal.inv_pow]
   rw [hcoll, h9, add_assoc, ← hx, h8]
   refine add_le_add le_rfl ?_
-  calc (2⁻¹ : ENNReal) ^ 96 + (2⁻¹ : ENNReal) ^ 9
+  calc (2⁻¹ : ENNReal) ^ 128 + (2⁻¹ : ENNReal) ^ 9
       ≤ (2⁻¹ : ENNReal) ^ 9 + (2⁻¹ : ENNReal) ^ 9 := add_le_add (inv_two_pow_anti (by norm_num)) le_rfl
     _ = (2⁻¹ : ENNReal) ^ 8 := inv_two_pow_succ_add 8
 
 /-- After a union bound over all `2²⁵⁶` messages, the four search failures stay below `2⁻²⁵⁶`. -/
 theorem closing_sum :
     (2 : ENNReal) ^ 256 *
-      ((2⁻¹ : ENNReal) ^ (2 ^ 11) + 5 * (2⁻¹ : ENNReal) ^ (2 ^ 10))
+      ((2⁻¹ : ENNReal) ^ (2 ^ 11) + 6 * (2⁻¹ : ENNReal) ^ (2 ^ 10))
       ≤ ((2 ^ 256 : Nat) : ENNReal)⁻¹ := by
   have hcast : ((2 ^ 256 : Nat) : ENNReal)⁻¹ = (2⁻¹ : ENNReal) ^ 256 := by
     rw [Nat.cast_pow, Nat.cast_ofNat, ENNReal.inv_pow]
   have ha : (2⁻¹ : ENNReal) ^ (2 ^ 11) ≤ (2⁻¹ : ENNReal) ^ 515 := inv_two_pow_anti (by norm_num)
   have hb : (2⁻¹ : ENNReal) ^ (2 ^ 10) ≤ (2⁻¹ : ENNReal) ^ 515 := inv_two_pow_anti (by norm_num)
-  have hsix : (2⁻¹ : ENNReal) ^ 515 + 5 * (2⁻¹ : ENNReal) ^ 515 ≤ (2⁻¹ : ENNReal) ^ 512 := by
+  have hsix : (2⁻¹ : ENNReal) ^ 515 + 6 * (2⁻¹ : ENNReal) ^ 515 ≤ (2⁻¹ : ENNReal) ^ 512 := by
     calc
       _ ≤ 8 * (2⁻¹ : ENNReal) ^ 515 := by
         calc
-          _ = 6 * (2⁻¹ : ENNReal) ^ 515 := by ring
+          _ = 7 * (2⁻¹ : ENNReal) ^ 515 := by ring
           _ ≤ 8 * (2⁻¹ : ENNReal) ^ 515 :=
-            mul_le_mul' (by norm_num : (6 : ENNReal) ≤ 8) le_rfl
+            mul_le_mul' (by norm_num : (7 : ENNReal) ≤ 8) le_rfl
       _ = _ := by
         have hfactor : (8 : ENNReal) * (2⁻¹ : ENNReal) ^ 3 = 1 := by
           apply (ENNReal.toReal_eq_toReal_iff' (by finiteness) (by finiteness)).mp
@@ -129,7 +129,7 @@ theorem closing_sum :
   rw [hcast]
   calc
     (2 : ENNReal) ^ 256 *
-          ((2⁻¹ : ENNReal) ^ (2 ^ 11) + 5 * (2⁻¹ : ENNReal) ^ (2 ^ 10))
+          ((2⁻¹ : ENNReal) ^ (2 ^ 11) + 6 * (2⁻¹ : ENNReal) ^ (2 ^ 10))
         ≤ (2 : ENNReal) ^ 256 * (2⁻¹ : ENNReal) ^ 512 :=
           mul_le_mul_right ((add_le_add ha (mul_le_mul_right hb _)).trans hsix) _
     _ = (2⁻¹ : ENNReal) ^ 256 := by

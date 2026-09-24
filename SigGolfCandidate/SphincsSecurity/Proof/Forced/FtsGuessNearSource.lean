@@ -52,7 +52,7 @@ theorem referenceNearWitnessRest_initial_bound (dummy : OtsReferenceWords) (adve
             (canonicalReferenceResidual parameter (canonicalGraphGameInputs adversary)
               (canonicalEncodingInputs_subset_gameInputs adversary parameter) labels auxiliary.rows auxiliary.seed)))
         labels auxiliary.selections dummy adversary]] ≤
-      ((2 ^ 128 - budget : Nat) : ENNReal)⁻¹ *
+      ((2 ^ 160 - budget : Nat) : ENNReal)⁻¹ *
         ∑ slot ∈ Finset.range budget, forcedNearProbability dummy adversary slot parameter otsSecret labels auxiliary := by
   have h := (initial_reference_near_witnesses parameter otsSecret (canonicalGraphGameInputs adversary)
     (canonicalEncodingInputs_subset_gameInputs adversary parameter) labels auxiliary hauxiliary dummy adversary).trans
@@ -107,7 +107,7 @@ theorem referenceForgeryGame_near_guess_le_forced (dummy : OtsReferenceWords) (a
     (hbudget : HasHashQueryBound scheme adversary budget) :
     Pr[ReferenceForgerySample.nearGuess dummy | referenceForgeryGame (canonicalGraphGameInputs adversary)
       (canonicalEncodingInputs_subset_gameInputs adversary) dummy adversary] ≤
-      ((2 ^ 128 - budget : Nat) : ENNReal)⁻¹ *
+      ((2 ^ 160 - budget : Nat) : ENNReal)⁻¹ *
         ∑ slot ∈ Finset.range budget, Pr[fun hit => hit = true | forcedNearGame dummy adversary slot] := by
   have hsource := referenceForgeryGame_bind_auxiliary (canonicalGraphGameInputs adversary)
     (canonicalEncodingInputs_subset_gameInputs adversary) (canonicalGraphInputs_subset_gameInputs adversary) dummy adversary
@@ -154,9 +154,9 @@ theorem forgeAdvantage_le_forcedNear_small_budget (dummy : OtsReferenceWords)
     (adversary : Adversary) (q : Nat) (hbound : HasHashQueryBound scheme adversary q)
     (hsmall : q ≤ budgetSplit) :
     forgeAdvantage scheme adversary ≤
-      primitiveCoefficient * ((q : ENNReal) / 2 ^ 128) + (q : ENNReal) * fullCertificateExcessRate +
+      primitiveCoefficient * ((q : ENNReal) / 2 ^ 144) + (q : ENNReal) * fullCertificateExcessRate +
       proposalPrefixExceptionBound + ((q : ENNReal) / 2 ^ 128) ^ 2 / (2 * (1 - (q : ENNReal) / 2 ^ 128) ^ 2) +
-      ((2 ^ 128 - q : Nat) : ENNReal)⁻¹ *
+      ((2 ^ 160 - q : Nat) : ENNReal)⁻¹ *
         ∑ slot ∈ Finset.range q, Pr[fun hit => hit = true | FtsGuessHash.forcedNearGame dummy adversary slot] :=
   (forgeAdvantage_le_nearGuess_normalized_small_budget dummy hdummy adversary q hbound hsmall).trans
     (add_le_add le_rfl (FtsGuessHash.referenceForgeryGame_near_guess_le_forced dummy adversary q hbound))

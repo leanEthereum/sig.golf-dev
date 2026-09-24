@@ -86,7 +86,7 @@ theorem monitoredSourceGame_stop_add_strong_le (dummy : OtsReferenceWords)
     Pr[fun result => result.1 = none | monitoredSourceGame dummy adversary budget stopAfter] +
       Pr[MonitoredStrongWin | monitoredSourceGame dummy adversary budget stopAfter] ≤
       ENNReal.ofReal (2 * ((budget : ℝ) / 2 ^ digestBits) - ((budget : ℝ) / 2 ^ digestBits) ^ 2) +
-        (budget : ENNReal) * fullCertificateExcessRate +
+        (budget : ENNReal) * fullCertificateTotalRate +
         Pr[MonitoredStrongException | monitoredSourceGame dummy adversary budget stopAfter] := by
   unfold monitoredSourceGame
   apply probEvent_bind_add_le_const_add
@@ -113,7 +113,7 @@ theorem forgeAdvantage_le_monitored_bound_add_exception (dummy : OtsReferenceWor
     (hcost : HasHashQueryBound scheme adversary budget) (hbudget : budget ≤ 2 ^ 127) :
     forgeAdvantage scheme adversary ≤
       ENNReal.ofReal (2 * ((budget : ℝ) / 2 ^ digestBits) - ((budget : ℝ) / 2 ^ digestBits) ^ 2) +
-        (budget : ENNReal) * fullCertificateExcessRate +
+        (budget : ENNReal) * fullCertificateTotalRate +
         Pr[MonitoredStrongException | monitoredSourceGame dummy adversary budget stopAfter] := by
   have h := forgeAdvantage_le_source_stop_add_win dummy adversary
   rw [← monitoredSourceGame_erasure dummy adversary budget stopAfter, probEvent_map, probEvent_map] at h

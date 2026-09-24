@@ -64,7 +64,7 @@ theorem expected_initialMonitoredSource_full_unit_count_le
     (hq : HasHashQueryBound scheme adversary q) (hbudget : q ≤ 2 ^ 127) :
     (∑' result, Pr[= result | initialMonitoredSource key adversary encoding dummy exposed high q Finset.univ (proposalStop stopAfter) stopped] *
       certificateBankCount result.2.2.bank) ≤
-        (2 ^ 128 : ENNReal)⁻¹ *
+        (2 ^ 144 : ENNReal)⁻¹ *
           (∑' result, Pr[= result | initialMonitoredSource key adversary encoding dummy exposed high q Finset.univ (proposalStop stopAfter) stopped] *
             result.2.1.memory.messageCalls.length) + (q : ENNReal) * fullCertificateExcessRate := by
   let state : ProposalState (gameInputs adversary) :=
@@ -109,9 +109,9 @@ theorem expected_initialMonitoredSource_full_unit_count_le
     encoding.selections encoding.rows q Finset.univ (proposalStop stopAfter)
     (unloggedRetainedRestComputation adversary ⟨key.root, key.parameter⟩) state hvalid
     (sourceInputs_unlogged_subset_gameInputs adversary key) fixedProposalLength
-    (fun word => terminalCertificatePrice Finset.univ word - (2 ^ 128 : ENNReal)⁻¹)
+    (fun word => terminalCertificatePrice Finset.univ word - (2 ^ 144 : ENNReal)⁻¹)
   change (∑' result, Pr[= result | law] * terminalProposalPotential (PMF.uniformOfFintype Index) fixedProposalLength
-    (fun word => terminalCertificatePrice Finset.univ word - (2 ^ 128 : ENNReal)⁻¹) result.2.1) = _ at huniform
+    (fun word => terminalCertificatePrice Finset.univ word - (2 ^ 144 : ENNReal)⁻¹) result.2.1) = _ at huniform
   have hzero : state.2.2.creationCost = 0 := rfl
   rw [hzero, zero_add] at hcost
   have hempty : state.1 = [] := rfl
@@ -123,11 +123,11 @@ theorem expected_initialMonitoredSource_full_unit_count_le
     _ = ∑' result, Pr[= result | law] * result.2.2.2.creationCost := (herase (fun result => result.2.2.creationCost)).symm
     _ ≤ ∑' result, Pr[= result | law] * (result.2.2.2.creationMass *
         terminalProposalPotential (PMF.uniformOfFintype Index) fixedProposalLength (terminalCertificatePrice Finset.univ) result.2.1) := hcost
-    _ ≤ (2 ^ 128 : ENNReal)⁻¹ * (∑' result, Pr[= result | law] * result.2.2.2.creationMass) +
+    _ ≤ (2 ^ 144 : ENNReal)⁻¹ * (∑' result, Pr[= result | law] * result.2.2.2.creationMass) +
         (q : ENNReal) * ∑' result, Pr[= result | law] * terminalProposalPotential (PMF.uniformOfFintype Index) fixedProposalLength
-          (fun word => terminalCertificatePrice Finset.univ word - (2 ^ 128 : ENNReal)⁻¹) result.2.1 :=
+          (fun word => terminalCertificatePrice Finset.univ word - (2 ^ 144 : ENNReal)⁻¹) result.2.1 :=
       expected_weighted_terminalPotential_le law (fun result => result.2.1) (fun result => result.2.2.2.creationMass)
-        q (2 ^ 128 : ENNReal)⁻¹ hmass fixedProposalLength (terminalCertificatePrice Finset.univ)
+        q (2 ^ 144 : ENNReal)⁻¹ hmass fixedProposalLength (terminalCertificatePrice Finset.univ)
     _ ≤ _ := by
       rw [huniform]
       have hm := herase (fun result => result.2.2.creationMass)

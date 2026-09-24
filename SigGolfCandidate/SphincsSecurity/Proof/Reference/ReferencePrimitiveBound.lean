@@ -70,7 +70,7 @@ theorem primitive_rates_small (q : Nat) (hq : q ≤ budgetSplit) :
       primitiveEncodingRate q ≤ primitiveCoefficient / Fintype.card Digest := by
   rw [budgetSplit_def] at hq
   rw [primitiveCoefficient_def]
-  have hcard : Fintype.card Digest = 2 ^ 128 := by simp [digestBits]
+  have hcard : Fintype.card Digest = 2 ^ 160 := by simp [digestBits]
   have hn : (Fintype.card Digest : ENNReal) ≠ 0 := by positivity
   have hx : ((3 * 2 ^ 114 : Nat) : ENNReal) / Fintype.card Digest < 1 := by
     rw [ENNReal.div_lt_iff (Or.inl hn) (Or.inl (by finiteness)), one_mul]
@@ -167,7 +167,7 @@ theorem referenceGraphContextGame_primitive_small_budget (dummy : OtsReferenceWo
         (∑' result, Pr[= result | referenceRecordedGame (canonicalGraphGameInputs adversary)
           (canonicalEncodingInputs_subset_gameInputs adversary) dummy adversary] * (result.messageCalls : ENNReal)) ≤
         primitiveCoefficient * ((q : ENNReal) / Fintype.card Digest) := by
-  have hcard : Fintype.card Digest = 2 ^ 128 := by simp [digestBits]
+  have hcard : Fintype.card Digest = 2 ^ 160 := by simp [digestBits]
   have hq : q < Fintype.card Digest := hsmall.trans_lt (budgetSplit_le.trans_lt (by rw [hcard]; norm_num))
   have hr := primitive_rates_small q hsmall
   have ho : (Fintype.card Digest : ENNReal)⁻¹ ≤ primitiveCoefficient / Fintype.card Digest := by

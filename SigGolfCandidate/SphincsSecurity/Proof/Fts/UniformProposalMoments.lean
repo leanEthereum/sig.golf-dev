@@ -68,7 +68,7 @@ theorem expected_uniformProposalWord_power_sum {α : Type} [SampleableType α] [
 theorem reuseRawEnvelope_le_expected_uniformProposalWord (key : SecretKey)
     (spent queries signatures bound proposals : Nat) (state : CoverLogState) (remaining : Finset FtsTree)
     (consumed : Index → Nat) (hqueries : spent + queries ≤ 2 ^ 127) (hsignatures : signatures ≤ signatureLimit)
-    (hdegree : remaining.card ≤ bound) (hbound : bound ≤ 20)
+    (hdegree : remaining.card ≤ bound) (hbound : bound ≤ 24)
     (hcache : ∀ index : Index, cachedIndexMultiplicity key.parameter state.1 index ≤
       (spent : ENNReal) * ((2 ^ 42 : Nat) : ENNReal)⁻¹ + ((2 ^ 74 : Nat) : ENNReal))
     (hcounts : ∀ index : Index,
@@ -83,8 +83,8 @@ theorem reuseRawEnvelope_le_expected_uniformProposalWord (key : SecretKey)
     consumed hqueries hsignatures hdegree hbound hcache hcounts hroom
 
 theorem targetProposalRoom_of_prefix (completed signatures total used degree slack : Nat)
-    (hsignatures : completed + signatures ≤ signatureLimit) (hdegree : degree ≤ 20)
-    (htotal : targetProposalOverhead * signatureLimit + slack + 19 ≤ (total : ENNReal))
+    (hsignatures : completed + signatures ≤ signatureLimit) (hdegree : degree ≤ 24)
+    (htotal : targetProposalOverhead * signatureLimit + slack + 23 ≤ (total : ENNReal))
     (hused : (used : ENNReal) ≤ targetProposalOverhead * completed + slack) :
     targetProposalOverhead * signatures + degree ≤ ((total - used + 1 : Nat) : ENNReal) := by
   have hcompleted : completed ≤ signatureLimit := (Nat.le_add_right completed signatures).trans hsignatures
@@ -92,7 +92,7 @@ theorem targetProposalRoom_of_prefix (completed signatures total used degree sla
     apply (Nat.cast_le (α := ENNReal)).mp
     exact hused.trans ((add_le_add (mul_le_mul' le_rfl (Nat.cast_le.mpr hcompleted)) le_rfl).trans
       ((le_self_add : targetProposalOverhead * signatureLimit + slack ≤
-        targetProposalOverhead * signatureLimit + slack + 19).trans htotal))
+        targetProposalOverhead * signatureLimit + slack + 23).trans htotal))
   have hcapacity : (used : ENNReal) + (targetProposalOverhead * signatures + degree) ≤ (total : ENNReal) + 1 := by
     calc
       _ ≤ targetProposalOverhead * completed + slack + (targetProposalOverhead * signatures + degree) :=
@@ -100,10 +100,10 @@ theorem targetProposalRoom_of_prefix (completed signatures total used degree sla
       _ = targetProposalOverhead * ((completed + signatures : Nat) : ENNReal) + slack + degree := by
         push_cast
         ring
-      _ ≤ targetProposalOverhead * signatureLimit + slack + 20 :=
+      _ ≤ targetProposalOverhead * signatureLimit + slack + 24 :=
         add_le_add (add_le_add (mul_le_mul' le_rfl (Nat.cast_le.mpr hsignatures)) le_rfl)
           (by exact_mod_cast hdegree)
-      _ = (targetProposalOverhead * signatureLimit + slack + 19) + 1 := by ring
+      _ = (targetProposalOverhead * signatureLimit + slack + 23) + 1 := by ring
       _ ≤ _ := add_le_add htotal le_rfl
   have hsum : ((total - used + 1 : Nat) : ENNReal) + (used : ENNReal) = (total : ENNReal) + 1 := by
     exact_mod_cast (show total - used + 1 + used = total + 1 by omega)
@@ -114,7 +114,7 @@ theorem targetProposalRoom_of_prefix (completed signatures total used degree sla
     _ = _ := hsum.symm
 
 theorem targetProposalPoolMinimum_eq :
-    targetProposalOverhead * signatureLimit + (proposalPrefixSlack : ENNReal) + 19 = (fixedProposalLength : ENNReal) := by
+    targetProposalOverhead * signatureLimit + (proposalPrefixSlack : ENNReal) + 23 = (fixedProposalLength : ENNReal) := by
   unfold targetProposalOverhead
   rw [proposalPrefixSlack_def, fixedProposalLength_def]
   apply (ENNReal.toReal_eq_toReal_iff' (by finiteness) (by finiteness)).mp
@@ -134,14 +134,14 @@ theorem reuseRawEnvelope_le_expected_terminalProposalWord (key : SecretKey)
     reuseRawEnvelope key nearUniformDigestReuseWeight queries (signatureLimit - completed) state ∅ remaining ≤
       ∑' word : List Index, Pr[= word | sampleUniformProposalWord Index (total - consumedWord.length)] *
         ∑ index : Index, ((consumedWord ++ word).count index : ENNReal) ^ remaining.card := by
-  have hdegree : remaining.card ≤ 20 := by
-    exact (Finset.card_le_univ remaining).trans_eq (by decide : Fintype.card FtsTree = 20)
+  have hdegree : remaining.card ≤ 24 := by
+    exact (Finset.card_le_univ remaining).trans_eq (by decide : Fintype.card FtsTree = 24)
   have hroom : targetProposalOverhead * (signatureLimit - completed : Nat) + remaining.card ≤
       ((total - consumedWord.length + 1 : Nat) : ENNReal) :=
     targetProposalRoom_of_prefix completed (signatureLimit - completed) total consumedWord.length remaining.card proposalPrefixSlack
       (by omega) hdegree
       (by rw [targetProposalPoolMinimum_eq]; exact_mod_cast htotal) hprefix
-  have h := reuseRawEnvelope_le_expected_uniformProposalWord key spent queries (signatureLimit - completed) 20
+  have h := reuseRawEnvelope_le_expected_uniformProposalWord key spent queries (signatureLimit - completed) 24
     (total - consumedWord.length) state remaining (fun index => consumedWord.count index) hqueries (Nat.sub_le _ _)
     hdegree le_rfl hcache hcounts hroom
   simpa only [List.count_append, Nat.cast_add] using h

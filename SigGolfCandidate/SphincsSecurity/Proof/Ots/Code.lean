@@ -23,22 +23,26 @@ irreducible_def decode (digest : Digest) : Option Encoding := TargetSum.decodeDi
 theorem decode_valid {digest : Digest} {word : Encoding} (hdecode : decode digest = some word) : Valid word := by
   rw [decode_def] at hdecode
   rw [Valid_def]
-  by_cases hvalid : digest.getLsbD 63 = false ∧ digest.getLsbD 127 = false ∧ TargetSum.Valid (TargetSum.digestEncoding digest)
+  by_cases hvalid : digest.getLsbD 78 = false ∧ digest.getLsbD 79 = false ∧
+      digest.getLsbD 158 = false ∧ digest.getLsbD 159 = false ∧
+      TargetSum.Valid (TargetSum.digestEncoding digest)
   · rw [TargetSum.decodeDigest, if_pos hvalid] at hdecode
-    exact Option.some.inj hdecode ▸ hvalid.2.2
+    exact Option.some.inj hdecode ▸ hvalid.2.2.2.2
   · rw [TargetSum.decodeDigest, if_neg hvalid] at hdecode
     simp at hdecode
 
 private theorem digest_eq_of_encoding_eq_of_padding {left right : Digest}
     (hencoding : TargetSum.digestEncoding left = TargetSum.digestEncoding right)
-    (hleft63 : left.getLsbD 63 = false) (hleft127 : left.getLsbD 127 = false)
-    (hright63 : right.getLsbD 63 = false) (hright127 : right.getLsbD 127 = false) :
+    (hleft78 : left.getLsbD 78 = false) (hleft79 : left.getLsbD 79 = false)
+    (hleft158 : left.getLsbD 158 = false) (hleft159 : left.getLsbD 159 = false)
+    (hright78 : right.getLsbD 78 = false) (hright79 : right.getLsbD 79 = false)
+    (hright158 : right.getLsbD 158 = false) (hright159 : right.getLsbD 159 = false) :
     left = right := by
   apply BitVec.eq_of_getLsbD_eq
   intro bit hbit
-  by_cases hlow : bit < 63
+  by_cases hlow : bit < 78
   · let chainIdx : ChainIndex := ⟨bit / 3, by
-      have : bit / 3 < 21 := by omega
+      have : bit / 3 < 26 := by omega
       exact lt_of_lt_of_le this (by decide)⟩
     have hchain := congrFun hencoding chainIdx
     change (left.extractLsb' (TargetSum.digitOffset chainIdx) winternitzBits).toFin =
@@ -61,40 +65,46 @@ private theorem digest_eq_of_encoding_eq_of_padding {left right : Digest}
       Bool.true_and, hoffset, show 3 * chainIdx.val + (bit - 3 * chainIdx.val) = bit by
         dsimp only [chainIdx]
         omega] using hbitEq
-  · by_cases hpad : bit = 63
+  · by_cases hpad : bit = 78
     · subst bit
-      rw [hleft63, hright63]
-    · by_cases hhigh : bit < 127
-      · let chainIdx : ChainIndex := ⟨21 + (bit - 64) / 3, by
-          have hbit64 : 64 ≤ bit := by omega
-          have : (bit - 64) / 3 < 21 := by omega
+      rw [hleft78, hright78]
+    · by_cases hpad2 : bit = 79
+      · subst bit
+        rw [hleft79, hright79]
+      · by_cases hhigh : bit < 158
+        · let chainIdx : ChainIndex := ⟨26 + (bit - 80) / 3, by
+          have hbit80 : 80 ≤ bit := by omega
+          have : (bit - 80) / 3 < 26 := by omega
           norm_num [numChains]
           omega⟩
-        have hchain := congrFun hencoding chainIdx
-        change (left.extractLsb' (TargetSum.digitOffset chainIdx) winternitzBits).toFin =
-          (right.extractLsb' (TargetSum.digitOffset chainIdx) winternitzBits).toFin at hchain
-        have hword := BitVec.toFin_injective hchain
-        have hchainVal : chainIdx.val = 21 + (bit - 64) / 3 := rfl
-        have hoffset : TargetSum.digitOffset chainIdx = 64 + 3 * ((bit - 64) / 3) := by
-          rw [TargetSum.digitOffset, if_neg (by rw [hchainVal]; norm_num [TargetSum.digitsPerHalf, numChains])]
-          rw [hchainVal]
-          norm_num [winternitzBits]
-          omega
-        have hwithin : bit - (64 + 3 * ((bit - 64) / 3)) < winternitzBits := by
-          norm_num [winternitzBits]
-          omega
-        have hbitEq := congrArg (fun word : BitVec winternitzBits =>
-          word.getLsbD (bit - (64 + 3 * ((bit - 64) / 3)))) hword
-        simpa only [TargetSum.digestEncoding, BitVec.getLsbD_extractLsb', hwithin, decide_true,
-          Bool.true_and, hoffset,
-          show 64 + 3 * ((bit - 64) / 3) +
-              (bit - (64 + 3 * ((bit - 64) / 3))) = bit by omega] using hbitEq
-      · have : bit = 127 := by
-          have := hbit
-          norm_num [digestBits] at this
-          omega
-        subst bit
-        rw [hleft127, hright127]
+          have hchain := congrFun hencoding chainIdx
+          change (left.extractLsb' (TargetSum.digitOffset chainIdx) winternitzBits).toFin =
+            (right.extractLsb' (TargetSum.digitOffset chainIdx) winternitzBits).toFin at hchain
+          have hword := BitVec.toFin_injective hchain
+          have hchainVal : chainIdx.val = 26 + (bit - 80) / 3 := rfl
+          have hoffset : TargetSum.digitOffset chainIdx = 80 + 3 * ((bit - 80) / 3) := by
+            rw [TargetSum.digitOffset, if_neg (by rw [hchainVal]; norm_num [TargetSum.digitsPerHalf, numChains])]
+            rw [hchainVal]
+            norm_num [winternitzBits]
+            omega
+          have hwithin : bit - (80 + 3 * ((bit - 80) / 3)) < winternitzBits := by
+            norm_num [winternitzBits]
+            omega
+          have hbitEq := congrArg (fun word : BitVec winternitzBits =>
+            word.getLsbD (bit - (80 + 3 * ((bit - 80) / 3)))) hword
+          simpa only [TargetSum.digestEncoding, BitVec.getLsbD_extractLsb', hwithin, decide_true,
+            Bool.true_and, hoffset,
+            show 80 + 3 * ((bit - 80) / 3) +
+                (bit - (80 + 3 * ((bit - 80) / 3))) = bit by omega] using hbitEq
+        · by_cases hpad3 : bit = 158
+          · subst bit
+            rw [hleft158, hright158]
+          · have : bit = 159 := by
+              have := hbit
+              norm_num [digestBits] at this
+              omega
+            subst bit
+            rw [hleft159, hright159]
 
 theorem decode_some_injective {left right : Digest} {word : Encoding}
     (hleft : decode left = some word) (hright : decode right = some word) : left = right := by
@@ -103,7 +113,8 @@ theorem decode_some_injective {left right : Digest} {word : Encoding}
   · rename_i hleftValid hrightValid
     exact digest_eq_of_encoding_eq_of_padding (Option.some.inj hleft |>.trans
       (Option.some.inj hright).symm) hleftValid.1 hleftValid.2.1
-      hrightValid.1 hrightValid.2.1
+      hleftValid.2.2.1 hleftValid.2.2.2.1
+      hrightValid.1 hrightValid.2.1 hrightValid.2.2.1 hrightValid.2.2.2.1
   all_goals simp at hleft hright
 
 /-- Two valid words cannot be ordered componentwise unless they are equal: walking chains forward from a revealed word never reaches another valid word. -/
@@ -121,13 +132,13 @@ theorem eq_of_le_of_valid {x y : Encoding} (hx : Valid x) (hy : Valid y)
 
 /-- A valid word, used where the proof needs a word before the reference encoding is known. -/
 irreducible_def defaultWord : Encoding :=
-  fun index => if index.val < 24 then ⟨7, by decide⟩ else if index.val = 24 then ⟨2, by decide⟩ else ⟨0, by decide⟩
+  fun index => if index.val < 27 then ⟨7, by decide⟩ else if index.val = 27 then ⟨5, by decide⟩ else ⟨0, by decide⟩
 
 theorem defaultWord_valid : Valid defaultWord := by
   rw [Valid_def]
-  change (∑ index : ChainIndex, (defaultWord index).val) = 170
+  change (∑ index : ChainIndex, (defaultWord index).val) = 194
   simp only [defaultWord_def]
-  change (∑ index : Fin 42, if index.val < 24 then (7 : Nat) else if index.val = 24 then 2 else 0) = 170
+  change (∑ index : Fin 52, if index.val < 27 then (7 : Nat) else if index.val = 27 then 5 else 0) = 194
   norm_num [Fin.sum_univ_succ]
 
 /-- The chain steps a signer walks to reveal a word. -/
@@ -269,11 +280,11 @@ theorem allUnitNeighbors_card_le (reference : Encoding) : (allUnitNeighbors refe
 
 /-! ### Values, for the closing arithmetic only -/
 
-theorem unitNeighborBound_eq : unitNeighborBound = 41 := by
+theorem unitNeighborBound_eq : unitNeighborBound = 51 := by
   rw [unitNeighborBound_def]
   rfl
 
-theorem neighborBound_eq : neighborBound = 1722 := by
+theorem neighborBound_eq : neighborBound = 2652 := by
   rw [neighborBound_def]
   rfl
 
@@ -314,7 +325,7 @@ abbrev counterBytes (counter : Counter) : HashInput := bytesLE 4 (BitVec.ofNat 3
 /-- Hash the message with the counter under the leaf's encoding tweak, and decode. -/
 def encodeAttempt (parameter : PublicParameter) (lay : Layer) (tree : TreeIndex) (leaf : LeafIndex)
     (message : Digest) (counter : Counter) : m (Option Encoding) := do
-  let digest ← tweakableHash parameter (.encoding lay tree leaf) (bytesLE 16 message ++ counterBytes counter)
+  let digest ← tweakableHash parameter (.encoding lay tree leaf) (bytesLE 20 message ++ counterBytes counter)
   return OtsCode.decode digest
 
 /-- The verifier's one-time leaf, or nothing if the counter does not encode the message. -/
