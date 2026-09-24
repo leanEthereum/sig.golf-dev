@@ -48,6 +48,15 @@ theorem writeHash_high (state : MachineState) (answer : BitVec 256)
       answer.extractLsb' 64 64 := by
   simp [writeHash, MachineState.writeWords_cons, destination]
 
+theorem writeHash_publicKey_frame (state : MachineState)
+    (answer : BitVec 256) (destination : state.getReg .x12 = 0x42000)
+    (index : Fin 2) :
+    (writeHash state answer).getMem (BitVec.ofNat 64 (0x40 + 8 * index.val)) =
+      state.getMem (BitVec.ofNat 64 (0x40 + 8 * index.val)) := by
+  fin_cases index <;>
+    simp [writeHash, MachineState.writeWords_cons, destination,
+      MachineState.getMem_setMem_ne]
+
 /-- The success path checks both 64-bit words and skips both rejection jumps. -/
 def compareSuccessState (state : MachineState) : MachineState :=
   let state := execInstrBr state (.LUI .x6 0x42)
@@ -151,6 +160,27 @@ theorem compareSuccess_block (state : MachineState)
   · rfl
   exact OrdinarySteps.refl _
 
+/-- The HASH answer feeds the two-word comparison without changing the loaded public key. -/
+theorem hashAnswer_compare_block (state : MachineState) (answer : BitVec 256)
+    (pc : state.pc = 0x1130)
+    (destination : state.getReg .x12 = 0x42000)
+    (low : answer.extractLsb' 0 64 = state.getMem 0x40)
+    (high : answer.extractLsb' 64 64 = state.getMem 0x48) :
+    OrdinarySteps SphincsImages.verify (writeHash state answer) 9
+      (compareSuccessState (writeHash state answer)) := by
+  apply compareSuccess_block
+  · simp [writeHash, pc]
+  · have keyFrame : (writeHash state answer).getMem 0x40 =
+        state.getMem 0x40 := by
+      simpa using writeHash_publicKey_frame state answer destination 0
+    rw [writeHash_low state answer destination, keyFrame]
+    exact low
+  · have keyFrame : (writeHash state answer).getMem 0x48 =
+        state.getMem 0x48 := by
+      simpa using writeHash_publicKey_frame state answer destination 1
+    rw [writeHash_high state answer destination, keyFrame]
+    exact high
+
 /-- info: 'SigGolfCandidate.SphincsVerifierCommitmentCheck.compareSuccess_block' depends on axioms: [propext,
  Classical.choice,
  Quot.sound] -/
@@ -168,5 +198,17 @@ theorem compareSuccess_block (state : MachineState)
 /-- info: 'SigGolfCandidate.SphincsVerifierCommitmentCheck.writeHash_high' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in
 #print axioms writeHash_high
+
+/-- info: 'SigGolfCandidate.SphincsVerifierCommitmentCheck.writeHash_publicKey_frame' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound] -/
+#guard_msgs in
+#print axioms writeHash_publicKey_frame
+
+/-- info: 'SigGolfCandidate.SphincsVerifierCommitmentCheck.hashAnswer_compare_block' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound] -/
+#guard_msgs in
+#print axioms hashAnswer_compare_block
 
 end SigGolfCandidate.SphincsVerifierCommitmentCheck
