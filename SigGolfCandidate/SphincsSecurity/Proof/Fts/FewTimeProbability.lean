@@ -3,7 +3,7 @@ import SigGolfCandidate.SphincsSecurity.Proof.Fts.FewTimeWitness
 /-!
 # Probability of a fixed few-time coverage pattern
 
-The relevant part of an admissible digest is its 26-bit index and its fourteen opened 10-bit leaf
+The relevant part of an admissible digest is its 34-bit index and its twenty opened 8-bit leaf
 coordinates.  For a fixed assignment of trees to distinct signing results, the successful tuples
 are in bijection with one free index and one free leaf vector per signing result.
 -/

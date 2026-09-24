@@ -3,7 +3,7 @@ import SigGolfCandidate.SphincsSecurity.Proof.Ots.LayerCompare
 /-!
 # Classifying an accepted forgery
 
-Descent through the three hypertree layers stops at a bad cache, at a one-time position not covered
+Descent through the hypertree layers stops at a bad cache, at a one-time position not covered
 exactly by the signing transcript, or at an honest few-time opening.
 -/
 
@@ -20,19 +20,35 @@ def VerifierLayerMessage (f : QueryImpl HashSpec Id) (parameter : PublicParamete
     evalWithAnswerFn f (otsLeafAttempt parameter bottomLayer (treeIndexAt index bottomLayer)
         (leafIndexAt index bottomLayer) ftsPublicKey (signature.counter bottomLayer)
         (signature.chainValue bottomLayer)) = some bottomLeaf
-      ∧ let middleMessage := foldValue f parameter bottomLayer
+      ∧ let middle3Message := foldValue f parameter bottomLayer
           (treeIndexAt index bottomLayer) (leafIndexAt index bottomLayer)
           (signaturePath signature bottomLayer) bottomLeaf (layerHeight bottomLayer)
-        ∃ middleLeaf,
-          evalWithAnswerFn f (otsLeafAttempt parameter middleLayer (treeIndexAt index middleLayer)
-              (leafIndexAt index middleLayer) middleMessage (signature.counter middleLayer)
-              (signature.chainValue middleLayer)) = some middleLeaf
-            ∧ let topMessage := foldValue f parameter middleLayer
-                (treeIndexAt index middleLayer) (leafIndexAt index middleLayer)
-                (signaturePath signature middleLayer) middleLeaf (layerHeight middleLayer)
-              (lay = bottomLayer ∧ message = ftsPublicKey)
-                ∨ (lay = middleLayer ∧ message = middleMessage)
-                ∨ (lay = topLayer ∧ message = topMessage)
+        ∃ middle3Leaf,
+          evalWithAnswerFn f (otsLeafAttempt parameter middle3Layer (treeIndexAt index middle3Layer)
+              (leafIndexAt index middle3Layer) middle3Message (signature.counter middle3Layer)
+              (signature.chainValue middle3Layer)) = some middle3Leaf
+            ∧ let middle2Message := foldValue f parameter middle3Layer
+                (treeIndexAt index middle3Layer) (leafIndexAt index middle3Layer)
+                (signaturePath signature middle3Layer) middle3Leaf (layerHeight middle3Layer)
+              ∃ middle2Leaf,
+                evalWithAnswerFn f (otsLeafAttempt parameter middle2Layer (treeIndexAt index middle2Layer)
+                    (leafIndexAt index middle2Layer) middle2Message (signature.counter middle2Layer)
+                    (signature.chainValue middle2Layer)) = some middle2Leaf
+                  ∧ let middleMessage := foldValue f parameter middle2Layer
+                      (treeIndexAt index middle2Layer) (leafIndexAt index middle2Layer)
+                      (signaturePath signature middle2Layer) middle2Leaf (layerHeight middle2Layer)
+                    ∃ middleLeaf,
+                      evalWithAnswerFn f (otsLeafAttempt parameter middleLayer (treeIndexAt index middleLayer)
+                          (leafIndexAt index middleLayer) middleMessage (signature.counter middleLayer)
+                          (signature.chainValue middleLayer)) = some middleLeaf
+                        ∧ let topMessage := foldValue f parameter middleLayer
+                            (treeIndexAt index middleLayer) (leafIndexAt index middleLayer)
+                            (signaturePath signature middleLayer) middleLeaf (layerHeight middleLayer)
+                          (lay = bottomLayer ∧ message = ftsPublicKey)
+                            ∨ (lay = middle3Layer ∧ message = middle3Message)
+                            ∨ (lay = middle2Layer ∧ message = middle2Message)
+                            ∨ (lay = middleLayer ∧ message = middleMessage)
+                            ∨ (lay = topLayer ∧ message = topMessage)
 
 def FullyHonestOpening (f : QueryImpl HashSpec Id) (cache : QueryCache HashSpec)
     (secretKey : SecretKey) (index : Index) (leaves : IndexGroup → FtsLeaf)
@@ -62,12 +78,28 @@ theorem middleTree_eq_of_top_position_eq (leftIndex rightIndex : Index)
   rw [layers_link_top leftIndex, layers_link_top rightIndex, congrArg Fin.val htree,
     congrArg Fin.val hleaf]
 
-theorem bottomTree_eq_of_middle_position_eq (leftIndex rightIndex : Index)
+theorem middle2Tree_eq_of_middle_position_eq (leftIndex rightIndex : Index)
     (htree : treeIndexAt leftIndex middleLayer = treeIndexAt rightIndex middleLayer)
     (hleaf : leafIndexAt leftIndex middleLayer = leafIndexAt rightIndex middleLayer) :
-    treeIndexAt leftIndex bottomLayer = treeIndexAt rightIndex bottomLayer := by
+    treeIndexAt leftIndex middle2Layer = treeIndexAt rightIndex middle2Layer := by
   apply Fin.ext
   rw [layers_link_middle leftIndex, layers_link_middle rightIndex, congrArg Fin.val htree,
+    congrArg Fin.val hleaf]
+
+theorem middle3Tree_eq_of_middle2_position_eq (leftIndex rightIndex : Index)
+    (htree : treeIndexAt leftIndex middle2Layer = treeIndexAt rightIndex middle2Layer)
+    (hleaf : leafIndexAt leftIndex middle2Layer = leafIndexAt rightIndex middle2Layer) :
+    treeIndexAt leftIndex middle3Layer = treeIndexAt rightIndex middle3Layer := by
+  apply Fin.ext
+  rw [layers_link_middle2 leftIndex, layers_link_middle2 rightIndex, congrArg Fin.val htree,
+    congrArg Fin.val hleaf]
+
+theorem bottomTree_eq_of_middle3_position_eq (leftIndex rightIndex : Index)
+    (htree : treeIndexAt leftIndex middle3Layer = treeIndexAt rightIndex middle3Layer)
+    (hleaf : leafIndexAt leftIndex middle3Layer = leafIndexAt rightIndex middle3Layer) :
+    treeIndexAt leftIndex bottomLayer = treeIndexAt rightIndex bottomLayer := by
+  apply Fin.ext
+  rw [layers_link_middle3 leftIndex, layers_link_middle3 rightIndex, congrArg Fin.val htree,
     congrArg Fin.val hleaf]
 
 theorem exact_top_message_eq_middle_root (f : QueryImpl HashSpec Id) (secretKey : SecretKey)
@@ -88,18 +120,54 @@ theorem exact_top_message_eq_middle_root (f : QueryImpl HashSpec Id) (secretKey 
     (layerHeight middleLayer) 0) = _
   rfl
 
-theorem exact_middle_message_eq_bottom_root (f : QueryImpl HashSpec Id) (secretKey : SecretKey)
+theorem exact_middle_message_eq_middle2_root (f : QueryImpl HashSpec Id) (secretKey : SecretKey)
     (signedIndex forgedIndex : Index) (message : Digest)
     (htree : treeIndexAt signedIndex middleLayer = treeIndexAt forgedIndex middleLayer)
     (hleaf : leafIndexAt signedIndex middleLayer = leafIndexAt forgedIndex middleLayer)
     (hmessage : evalWithAnswerFn f (layerMessage secretKey signedIndex middleLayer) = message) :
+    message = honestNode f secretKey.parameter middle2Layer
+      (treeIndexAt forgedIndex middle2Layer)
+      (secretKey.otsSecret middle2Layer (treeIndexAt forgedIndex middle2Layer))
+      (layerHeight middle2Layer) 0 := by
+  have hnext := middle2Tree_eq_of_middle_position_eq signedIndex forgedIndex htree hleaf
+  rw [← hmessage, layerMessage_of_lt secretKey signedIndex middleLayer (by decide)]
+  simp only [show (⟨middleLayer.val + 1, by decide⟩ : Layer) = middle2Layer from rfl, hnext]
+  change evalWithAnswerFn f (treeNode secretKey.parameter middle2Layer
+    (treeIndexAt forgedIndex middle2Layer)
+    (secretKey.otsSecret middle2Layer (treeIndexAt forgedIndex middle2Layer))
+    (layerHeight middle2Layer) 0) = _
+  rfl
+
+theorem exact_middle2_message_eq_middle3_root (f : QueryImpl HashSpec Id) (secretKey : SecretKey)
+    (signedIndex forgedIndex : Index) (message : Digest)
+    (htree : treeIndexAt signedIndex middle2Layer = treeIndexAt forgedIndex middle2Layer)
+    (hleaf : leafIndexAt signedIndex middle2Layer = leafIndexAt forgedIndex middle2Layer)
+    (hmessage : evalWithAnswerFn f (layerMessage secretKey signedIndex middle2Layer) = message) :
+    message = honestNode f secretKey.parameter middle3Layer
+      (treeIndexAt forgedIndex middle3Layer)
+      (secretKey.otsSecret middle3Layer (treeIndexAt forgedIndex middle3Layer))
+      (layerHeight middle3Layer) 0 := by
+  have hnext := middle3Tree_eq_of_middle2_position_eq signedIndex forgedIndex htree hleaf
+  rw [← hmessage, layerMessage_of_lt secretKey signedIndex middle2Layer (by decide)]
+  simp only [show (⟨middle2Layer.val + 1, by decide⟩ : Layer) = middle3Layer from rfl, hnext]
+  change evalWithAnswerFn f (treeNode secretKey.parameter middle3Layer
+    (treeIndexAt forgedIndex middle3Layer)
+    (secretKey.otsSecret middle3Layer (treeIndexAt forgedIndex middle3Layer))
+    (layerHeight middle3Layer) 0) = _
+  rfl
+
+theorem exact_middle3_message_eq_bottom_root (f : QueryImpl HashSpec Id) (secretKey : SecretKey)
+    (signedIndex forgedIndex : Index) (message : Digest)
+    (htree : treeIndexAt signedIndex middle3Layer = treeIndexAt forgedIndex middle3Layer)
+    (hleaf : leafIndexAt signedIndex middle3Layer = leafIndexAt forgedIndex middle3Layer)
+    (hmessage : evalWithAnswerFn f (layerMessage secretKey signedIndex middle3Layer) = message) :
     message = honestNode f secretKey.parameter bottomLayer
       (treeIndexAt forgedIndex bottomLayer)
       (secretKey.otsSecret bottomLayer (treeIndexAt forgedIndex bottomLayer))
       (layerHeight bottomLayer) 0 := by
-  have hnext := bottomTree_eq_of_middle_position_eq signedIndex forgedIndex htree hleaf
-  rw [← hmessage, layerMessage_of_lt secretKey signedIndex middleLayer (by decide)]
-  simp only [show (⟨middleLayer.val + 1, by decide⟩ : Layer) = bottomLayer from rfl, hnext]
+  have hnext := bottomTree_eq_of_middle3_position_eq signedIndex forgedIndex htree hleaf
+  rw [← hmessage, layerMessage_of_lt secretKey signedIndex middle3Layer (by decide)]
+  simp only [show (⟨middle3Layer.val + 1, by decide⟩ : Layer) = bottomLayer from rfl, hnext]
   change evalWithAnswerFn f (treeNode secretKey.parameter bottomLayer
     (treeIndexAt forgedIndex bottomLayer)
     (secretKey.otsSecret bottomLayer (treeIndexAt forgedIndex bottomLayer))

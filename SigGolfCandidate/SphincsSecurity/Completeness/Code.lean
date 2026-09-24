@@ -3,7 +3,7 @@ import SigGolfCandidate.SphincsSecurity.Scheme
 /-!
 # How many digests the target-sum code accepts
 
-The signer's counter search succeeds on a digest whose 42 three-bit digits sum to `T = 191` and
+The signer's counter search succeeds on a digest whose 42 three-bit digits sum to `T = 170` and
 whose two padding bits are clear, so the search's failure probability is governed by how many of
 the `2^128` digests that is. The count is the coefficient of `z^191` in `(1 + z + ... + z^7)^42`.
 
@@ -99,7 +99,7 @@ theorem codeCount_target :
   rw [weight_pow, sum_encoding_pow]
   exact (digit_of_sum base (by decide) codeCount codeCount_lt_base 295 targetSum (by decide)).symm
 
-theorem two_pow_le_codeCount : 2 ^ 114 ≤ codeCount targetSum := by
+theorem two_pow_le_codeCount : 2 ^ 119 ≤ codeCount targetSum := by
   rw [codeCount_target, weight_eq]
   decide
 
@@ -252,9 +252,9 @@ theorem decodeDigest_pack (x : Encoding) (hx : Valid x) : decodeDigest (pack x) 
   rw [decodeDigest, if_pos ⟨pack_padding_low x, pack_padding_high x, by rw [digestEncoding_pack]; exact hx⟩,
     digestEncoding_pack]
 
-/-- The signer's counter search accepts at least `2^114` of the `2^128` digests. -/
+/-- The signer's counter search accepts at least `2^119` of the `2^128` digests. -/
 theorem two_pow_le_card_accepting :
-    2 ^ 114 ≤ (Finset.univ.filter fun d : Digest => (decodeDigest d).isSome).card := by
+    2 ^ 119 ≤ (Finset.univ.filter fun d : Digest => (decodeDigest d).isSome).card := by
   refine le_trans two_pow_le_codeCount ?_
   rw [codeCount]
   apply Finset.card_le_card_of_injOn pack

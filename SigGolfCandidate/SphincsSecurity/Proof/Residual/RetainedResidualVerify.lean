@@ -57,11 +57,18 @@ theorem Compatible.hypertree_honest {inputs : Finset HashInput} {context : Conte
       ∀ tree, memory.routing.disclosed index tree (leaves (ftsIndexOf tree)) := by
   let ftsPublicKey := evalWithAnswerFn context.oracle
     (ftsRecover context.key.parameter index leaves signature.ftsSecret signature.ftsPath)
-  obtain ⟨bottomLeaf, hbottom, middleLeaf, hmiddle, topLeaf, htop⟩ :=
+  obtain ⟨bottomLeaf, hbottom, middle3Leaf, hmiddle3, middle2Leaf, hmiddle2,
+    middleLeaf, hmiddle, topLeaf, htop⟩ :=
     hypertreeRun_of_verify index signature ftsPublicKey context.key.root hverify hlayersRun
-  let middleMessage := foldValue context.oracle context.key.parameter bottomLayer
+  let middle3Message := foldValue context.oracle context.key.parameter bottomLayer
     (treeIndexAt index bottomLayer) (leafIndexAt index bottomLayer)
     (signaturePath signature bottomLayer) bottomLeaf (layerHeight bottomLayer)
+  let middle2Message := foldValue context.oracle context.key.parameter middle3Layer
+    (treeIndexAt index middle3Layer) (leafIndexAt index middle3Layer)
+    (signaturePath signature middle3Layer) middle3Leaf (layerHeight middle3Layer)
+  let middleMessage := foldValue context.oracle context.key.parameter middle2Layer
+    (treeIndexAt index middle2Layer) (leafIndexAt index middle2Layer)
+    (signaturePath signature middle2Layer) middle2Leaf (layerHeight middle2Layer)
   let topMessage := foldValue context.oracle context.key.parameter middleLayer
     (treeIndexAt index middleLayer) (leafIndexAt index middleLayer)
     (signaturePath signature middleLayer) middleLeaf (layerHeight middleLayer)
@@ -81,8 +88,16 @@ theorem Compatible.hypertree_honest {inputs : Finset HashInput} {context : Conte
     rfl rfl htopOpening.1.symm
   have hmiddleOpening := hcompatible.layer_frame_reference index signature middleLayer middleMessage context.key.root middleLeaf
     (context.words_valid hdummy _ _ _) hmiddle hmiddleRoot
-  have hbottomRoot := exact_middle_message_eq_bottom_root context.oracle context.key index index middleMessage
+  have hmiddle2Root := exact_middle_message_eq_middle2_root context.oracle context.key index index middleMessage
     rfl rfl hmiddleOpening.1.symm
+  have hmiddle2Opening := hcompatible.layer_frame_reference index signature middle2Layer middle2Message context.key.root middle2Leaf
+    (context.words_valid hdummy _ _ _) hmiddle2 hmiddle2Root
+  have hmiddle3Root := exact_middle2_message_eq_middle3_root context.oracle context.key index index middle2Message
+    rfl rfl hmiddle2Opening.1.symm
+  have hmiddle3Opening := hcompatible.layer_frame_reference index signature middle3Layer middle3Message context.key.root middle3Leaf
+    (context.words_valid hdummy _ _ _) hmiddle3 hmiddle3Root
+  have hbottomRoot := exact_middle3_message_eq_bottom_root context.oracle context.key index index middle3Message
+    rfl rfl hmiddle3Opening.1.symm
   have hbottomOpening := hcompatible.layer_frame_reference index signature bottomLayer ftsPublicKey context.key.root bottomLeaf
     (context.words_valid hdummy _ _ _) hbottom hbottomRoot
   have hftsKey := exact_bottom_message_eq_fts_key context.oracle context.key index index ftsPublicKey
@@ -94,19 +109,28 @@ theorem Compatible.hypertree_honest {inputs : Finset HashInput} {context : Conte
     fin_cases lay
     · simpa only [topLayer] using htopOpening.2
     · simpa only [middleLayer] using hmiddleOpening.2
+    · simpa only [middle2Layer] using hmiddle2Opening.2
+    · simpa only [middle3Layer] using hmiddle3Opening.2
     · simpa only [bottomLayer, numLayers] using hbottomOpening.2
   · intro lay
     have hverifier (position : Layer) (message : Digest)
         (hposition : position = bottomLayer ∧ message = ftsPublicKey ∨
+          position = middle3Layer ∧ message = middle3Message ∨
+          position = middle2Layer ∧ message = middle2Message ∨
           position = middleLayer ∧ message = middleMessage ∨ position = topLayer ∧ message = topMessage) :
         VerifierLayerMessage context.oracle context.key.parameter index leaves signature position message :=
-      ⟨bottomLeaf, hbottom.1, middleLeaf, hmiddle.1, hposition⟩
+      ⟨bottomLeaf, hbottom.1, middle3Leaf, hmiddle3.1,
+        middle2Leaf, hmiddle2.1, middleLeaf, hmiddle.1, hposition⟩
     fin_cases lay
     · rw [show (⟨0, by decide⟩ : Layer) = topLayer from rfl, ← htopOpening.1]
-      exact hverifier _ _ (Or.inr (Or.inr ⟨rfl, rfl⟩))
+      exact hverifier _ _ (Or.inr (Or.inr (Or.inr (Or.inr ⟨rfl, rfl⟩))))
     · rw [show (⟨1, by decide⟩ : Layer) = middleLayer from rfl, ← hmiddleOpening.1]
+      exact hverifier _ _ (Or.inr (Or.inr (Or.inr (Or.inl ⟨rfl, rfl⟩))))
+    · rw [show (⟨2, by decide⟩ : Layer) = middle2Layer from rfl, ← hmiddle2Opening.1]
+      exact hverifier _ _ (Or.inr (Or.inr (Or.inl ⟨rfl, rfl⟩)))
+    · rw [show (⟨3, by decide⟩ : Layer) = middle3Layer from rfl, ← hmiddle3Opening.1]
       exact hverifier _ _ (Or.inr (Or.inl ⟨rfl, rfl⟩))
-    · rw [show (⟨2, by decide⟩ : Layer) = bottomLayer from rfl, ← hbottomOpening.1]
+    · rw [show (⟨4, by decide⟩ : Layer) = bottomLayer from rfl, ← hbottomOpening.1]
       exact hverifier _ _ (Or.inl ⟨rfl, rfl⟩)
 
 theorem Compatible.verify_honest {inputs : Finset HashInput} {context : Context inputs} {memory : Memory}

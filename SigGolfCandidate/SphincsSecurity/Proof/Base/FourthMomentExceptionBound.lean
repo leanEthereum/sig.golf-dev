@@ -11,7 +11,7 @@ theorem fourth_le_fourthMomentBudget (q : Nat) (second fourth : ENNReal) :
   exact ((le_self_add.trans le_self_add).trans le_self_add)
 
 theorem fourthMomentBudget_zero_le (q : Nat) (hq : q ≤ 2 ^ 127) :
-    fourthMomentBudget q 0 0 / (2 : ENNReal) ^ 372 ≤ (q : ENNReal) / 2 ^ 223 := by
+    fourthMomentBudget q 0 0 / (2 : ENNReal) ^ 364 ≤ (q : ENNReal) / 2 ^ 215 := by
   have hchoose : 2 * q.choose 2 + q = q * q := by
     clear hq
     induction q with

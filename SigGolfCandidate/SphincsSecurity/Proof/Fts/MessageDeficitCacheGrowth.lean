@@ -78,7 +78,7 @@ theorem messageDeficitScore_cacheQuery (parameter : PublicParameter) (root : Dig
     (cache : QueryCache HashSpec) (hfinite : Finite cache) (input : HashInput) (output : HashOutput) (hfresh : cache input = none) :
     messageDeficitScore parameter root message (cache.cacheQuery input output) =
       if MessageInputAt parameter root message input then
-        messageDeficitScore parameter root message cache + (if Concrete.Admissible (truncateMessageDigest output) then -1023 else 1)
+        messageDeficitScore parameter root message cache + (if Concrete.Admissible (truncateMessageDigest output) then -255 else 1)
       else messageDeficitScore parameter root message cache := by
   rw [messageDeficitScore, cachedMessageEntryCount_cacheQuery _ _ _ _ _ _ hfresh,
     cachedMessageEntryCountWhere_cacheQuery _ _ _ _ _ _ hfresh]

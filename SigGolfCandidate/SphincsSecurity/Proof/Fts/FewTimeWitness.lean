@@ -3,7 +3,7 @@ import SigGolfCandidate.SphincsSecurity.Proof.Scheme.Replay
 /-!
 # Finite witnesses for the few-time leak
 
-A leak chooses one successful signing entry for each of the fourteen opened trees.  Keeping the
+A leak chooses one successful signing entry for each of the twenty opened trees. Keeping the
 range of that choice as a finset exposes the number of distinct signatures used by the opening.
 -/
 
@@ -21,10 +21,10 @@ theorem indexGroup_eq_ftsIndexOf_or_last (tree : IndexGroup) :
     rfl
   · right
     apply Fin.ext
-    change tree.val = 14
-    change ¬ tree.val < 14 at htree
+    change tree.val = 20
+    change ¬ tree.val < 20 at htree
     have hlt := tree.isLt
-    change tree.val < 15 at hlt
+    change tree.val < 21 at hlt
     omega
 
 end SphincsSecurity.Concrete

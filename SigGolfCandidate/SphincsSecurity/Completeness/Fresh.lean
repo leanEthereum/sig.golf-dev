@@ -406,7 +406,7 @@ theorem Avoids.layerMessage (secretKey : Seeded.SecretKey) (index : Index) (lay 
       (hnode _ _) (hotsDerive _ _)
   · exact Avoids.ftsKey f target _ index secretKey.seed hftsLeaf hftsNode hftsRoots hftsDerive
 
-/-- The three layers' counter searches hash under different layer fields, so none of them caches another's inputs. -/
+/-- Counter searches in different layers hash under distinct layer fields. -/
 theorem encodingInput_ne_of_layer_ne (parameter : PublicParameter) {lay lay' : Layer}
     (hlay : lay ≠ lay') (tree tree' : TreeIndex) (leaf leaf' : LeafIndex)
     (payload payload' : HashInput) :

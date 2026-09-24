@@ -12,7 +12,7 @@ theorem messageDigestFreshRate_balance (key : SecretKey) (message : Message) (ca
     (q : Nat) (hq : q ≤ 2 ^ 127) (hcache : QueryCache.enncard cache ≤ q) :
     messageDigestFreshRate key message cache * ((2 ^ randomnessBits : Nat) : ENNReal) +
       (cachedMessageEntryCount cache key.parameter key.root message + (digestAttemptLimit : ENNReal)) *
-        ((2 ^ ftsTreeHeight : Nat) : ENNReal)⁻¹ = ((2 ^ 118 : Nat) : ENNReal) := by
+        ((2 ^ ftsTreeHeight : Nat) : ENNReal)⁻¹ = ((2 ^ 120 : Nat) : ENNReal) := by
   let count := cachedMessageEntryCount cache key.parameter key.root message + (digestAttemptLimit : ENNReal)
   let space : ENNReal := (2 ^ randomnessBits : Nat)
   let admissible : ENNReal := ((2 ^ ftsTreeHeight : Nat) : ENNReal)⁻¹
@@ -38,7 +38,7 @@ theorem messageDigestFreshRate_balance (key : SecretKey) (message : Message) (ca
 theorem normalizedMessageReuseWeight_le_deficit (key : SecretKey) (message : Message) (cache : QueryCache HashSpec)
     (q : Nat) (hq : q ≤ 2 ^ 127) (hcache : QueryCache.enncard cache ≤ q) :
     normalizedMessageReuseWeight key message cache ≤
-      (((2 ^ 118 : Nat) : ENNReal) - ((digestAttemptLimit : ENNReal) * ((2 ^ ftsTreeHeight : Nat) : ENNReal)⁻¹ +
+      (((2 ^ 120 : Nat) : ENNReal) - ((digestAttemptLimit : ENNReal) * ((2 ^ ftsTreeHeight : Nat) : ENNReal)⁻¹ +
         messageAdmissibleDeficit key message cache))⁻¹ := by
   rw [normalizedMessageReuseWeight_eq_inv key message cache q hq hcache]
   apply ENNReal.inv_le_inv.mpr
@@ -55,11 +55,11 @@ theorem normalizedMessageReuseWeight_le_near_uniform_of_deficit
     (key : SecretKey) (message : Message) (cache : QueryCache HashSpec)
     (q : Nat) (hq : q ≤ 2 ^ 127) (hcache : QueryCache.enncard cache ≤ q)
     (hdeficit : messageAdmissibleDeficit key message cache ≤ ((2 ^ 83 : Nat) : ENNReal)) :
-    normalizedMessageReuseWeight key message cache ≤ (1025 / 1024 : ENNReal) * ((2 ^ 118 : Nat) : ENNReal)⁻¹ := by
+    normalizedMessageReuseWeight key message cache ≤ (1025 / 1024 : ENNReal) * ((2 ^ 120 : Nat) : ENNReal)⁻¹ := by
   apply (normalizedMessageReuseWeight_le_deficit key message cache q hq hcache).trans
   apply (ENNReal.inv_le_inv.mpr (tsub_le_tsub_left (add_le_add le_rfl hdeficit) _)).trans
   have hsmall : (digestAttemptLimit : ENNReal) * ((2 ^ ftsTreeHeight : Nat) : ENNReal)⁻¹ + ((2 ^ 83 : Nat) : ENNReal) <
-      ((2 ^ 118 : Nat) : ENNReal) := by
+      ((2 ^ 120 : Nat) : ENNReal) := by
     apply (ENNReal.toReal_lt_toReal (by finiteness) (by finiteness)).mp
     rw [ENNReal.toReal_add (by finiteness) (by finiteness)]
     norm_num [ENNReal.toReal_mul, ENNReal.toReal_inv, digestAttemptLimit, ftsTreeHeight]
@@ -72,7 +72,7 @@ theorem exactDigestReuseWeight_le_near_uniform_of_deficit
     (key : SecretKey) (message : Message) (cache : QueryCache HashSpec)
     (q : Nat) (hq : q ≤ 2 ^ 127) (hcache : QueryCache.enncard cache ≤ q)
     (hdeficit : messageAdmissibleDeficit key message cache ≤ ((2 ^ 83 : Nat) : ENNReal)) :
-    exactDigestReuseWeight key message cache ≤ (1025 / 1024 : ENNReal) * ((2 ^ 118 : Nat) : ENNReal)⁻¹ :=
+    exactDigestReuseWeight key message cache ≤ (1025 / 1024 : ENNReal) * ((2 ^ 120 : Nat) : ENNReal)⁻¹ :=
   (exactDigestReuseWeight_le_normalizedMessage key message cache q hq hcache).trans
     (normalizedMessageReuseWeight_le_near_uniform_of_deficit key message cache q hq hcache hdeficit)
 

@@ -22,7 +22,7 @@ namespace SphincsSecurity.Concrete
 open _root_.OracleComp OracleSpec ENNReal
 
 noncomputable def nearUniformDigestReuseWeight : ENNReal :=
-  (1025 / 1024 : ENNReal) * ((2 ^ 118 : Nat) : ENNReal)⁻¹
+  (1025 / 1024 : ENNReal) * ((2 ^ 120 : Nat) : ENNReal)⁻¹
 
 theorem exactDigestReuseWeight_le_near_uniform_of_clean_cache (key : SecretKey) (cache : QueryCache HashSpec)
     (cap : Nat) (hcap : cap ≤ 2 ^ 127) (hcache : QueryCache.enncard cache ≤ cap)
@@ -43,7 +43,7 @@ theorem reuseRawEnvelope_le_binomialAverage (key : SecretKey) (reuse rate : ENNR
     (hprob : ∀ index : Index,
       (Fintype.card Index : ENNReal)⁻¹ + reuse *
         (cachedIndexMultiplicity key.parameter state.1 index +
-          (queries : ENNReal) * ((2 ^ 36 : Nat) : ENNReal)⁻¹ + bound + signatures) ≤ rate) :
+          (queries : ENNReal) * ((2 ^ 42 : Nat) : ENNReal)⁻¹ + bound + signatures) ≤ rate) :
     reuseRawEnvelope key reuse queries signatures state ∅ remaining ≤
       ∑ index : Index, binomialAverage rate signatures (fun count =>
         (((signingSlotsAtIndex (observedOptionalSigningViews
@@ -67,20 +67,20 @@ theorem targetProposalIndexRate_le_one : targetProposalIndexRate ≤ 1 := by
   norm_num [ENNReal.toReal_mul, ENNReal.toReal_div, ENNReal.toReal_inv, Index, totalHeight]
 
 theorem targetProposalRate_of_cache_bound (cache : ENNReal) (spent queries signatures bound : Nat)
-    (hqueries : spent + queries ≤ 2 ^ 127) (hsignatures : signatures ≤ signatureLimit) (hbound : bound ≤ 14)
-    (hcache : cache ≤ (spent : ENNReal) * ((2 ^ 36 : Nat) : ENNReal)⁻¹ + ((2 ^ 80 : Nat) : ENNReal)) :
+    (hqueries : spent + queries ≤ 2 ^ 127) (hsignatures : signatures ≤ signatureLimit) (hbound : bound ≤ 20)
+    (hcache : cache ≤ (spent : ENNReal) * ((2 ^ 42 : Nat) : ENNReal)⁻¹ + ((2 ^ 74 : Nat) : ENNReal)) :
     (Fintype.card Index : ENNReal)⁻¹ + nearUniformDigestReuseWeight *
-      (cache + (queries : ENNReal) * ((2 ^ 36 : Nat) : ENNReal)⁻¹ + bound + signatures) ≤
+      (cache + (queries : ENNReal) * ((2 ^ 42 : Nat) : ENNReal)⁻¹ + bound + signatures) ≤
         targetProposalIndexRate := by
-  have hsize : cache + (queries : ENNReal) * ((2 ^ 36 : Nat) : ENNReal)⁻¹ + bound + signatures ≤
-      ((2 ^ 127 : Nat) : ENNReal) * ((2 ^ 36 : Nat) : ENNReal)⁻¹ +
-        ((2 ^ 80 : Nat) : ENNReal) + 14 + signatureLimit := by
+  have hsize : cache + (queries : ENNReal) * ((2 ^ 42 : Nat) : ENNReal)⁻¹ + bound + signatures ≤
+      ((2 ^ 127 : Nat) : ENNReal) * ((2 ^ 42 : Nat) : ENNReal)⁻¹ +
+        ((2 ^ 74 : Nat) : ENNReal) + 20 + signatureLimit := by
     calc
-      _ ≤ (spent : ENNReal) * ((2 ^ 36 : Nat) : ENNReal)⁻¹ + ((2 ^ 80 : Nat) : ENNReal) +
-          (queries : ENNReal) * ((2 ^ 36 : Nat) : ENNReal)⁻¹ + bound + signatures := by
+      _ ≤ (spent : ENNReal) * ((2 ^ 42 : Nat) : ENNReal)⁻¹ + ((2 ^ 74 : Nat) : ENNReal) +
+          (queries : ENNReal) * ((2 ^ 42 : Nat) : ENNReal)⁻¹ + bound + signatures := by
         gcongr
-      _ = ((spent + queries : Nat) : ENNReal) * ((2 ^ 36 : Nat) : ENNReal)⁻¹ +
-          ((2 ^ 80 : Nat) : ENNReal) + bound + signatures := by
+      _ = ((spent + queries : Nat) : ENNReal) * ((2 ^ 42 : Nat) : ENNReal)⁻¹ +
+          ((2 ^ 74 : Nat) : ENNReal) + bound + signatures := by
         push_cast
         ring
       _ ≤ _ := by
@@ -97,9 +97,9 @@ theorem targetProposalRate_of_cache_bound (cache : ENNReal) (spent queries signa
 theorem reuseRawEnvelope_le_proposalIndexAverage (key : SecretKey)
     (spent queries signatures bound : Nat) (state : CoverLogState) (remaining : Finset FtsTree)
     (hqueries : spent + queries ≤ 2 ^ 127) (hsignatures : signatures ≤ signatureLimit)
-    (hdegree : remaining.card ≤ bound) (hbound : bound ≤ 14)
+    (hdegree : remaining.card ≤ bound) (hbound : bound ≤ 20)
     (hcache : ∀ index : Index, cachedIndexMultiplicity key.parameter state.1 index ≤
-      (spent : ENNReal) * ((2 ^ 36 : Nat) : ENNReal)⁻¹ + ((2 ^ 80 : Nat) : ENNReal)) :
+      (spent : ENNReal) * ((2 ^ 42 : Nat) : ENNReal)⁻¹ + ((2 ^ 74 : Nat) : ENNReal)) :
     reuseRawEnvelope key nearUniformDigestReuseWeight queries signatures state ∅ remaining ≤
       ∑ index : Index, binomialAverage targetProposalIndexRate signatures (fun count =>
         (((signingSlotsAtIndex (observedOptionalSigningViews
@@ -123,9 +123,9 @@ theorem proposalIndexAverage_le_uniformAverage (signatures proposals degree : Na
 theorem reuseRawEnvelope_le_uniformProposalAverage (key : SecretKey)
     (spent queries signatures bound proposals : Nat) (state : CoverLogState) (remaining : Finset FtsTree)
     (consumed : Index → Nat) (hqueries : spent + queries ≤ 2 ^ 127) (hsignatures : signatures ≤ signatureLimit)
-    (hdegree : remaining.card ≤ bound) (hbound : bound ≤ 14)
+    (hdegree : remaining.card ≤ bound) (hbound : bound ≤ 20)
     (hcache : ∀ index : Index, cachedIndexMultiplicity key.parameter state.1 index ≤
-      (spent : ENNReal) * ((2 ^ 36 : Nat) : ENNReal)⁻¹ + ((2 ^ 80 : Nat) : ENNReal))
+      (spent : ENNReal) * ((2 ^ 42 : Nat) : ENNReal)⁻¹ + ((2 ^ 74 : Nat) : ENNReal))
     (hcounts : ∀ index : Index,
       (signingSlotsAtIndex (observedOptionalSigningViews
         (FtsProbeSimulation.messageAnswers key.parameter state.1) key.root state.2) index).card ≤ consumed index)

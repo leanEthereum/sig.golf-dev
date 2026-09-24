@@ -7,11 +7,11 @@ import SigGolfCandidate.SphincsSecurity.Proof.Fts.MessageDeficitHashMoments
 # The randomizer search
 
 Each trial derives a randomizer from a fresh input, then hashes the message with it and keeps the
-digest if its last index group is zero, which a fresh answer does with probability `1/1024`. The
+digest if its last index group is zero, which a fresh answer does with probability `1/256`. The
 second query need not be fresh: a randomizer can repeat one an earlier trial drew, and then the
 digest is the earlier, rejected one. So the induction carries the set `R` of randomizers drawn so
 far. A trial lands in `R` with probability at most `|R| / 2 ^ 128`, and otherwise its digest query
-is fresh; either way one trial fails with probability at most `1023/1024 + 2 ^ 32 / 2 ^ 128`.
+is fresh; either way one trial fails with probability at most `255/256 + 2 ^ 32 / 2 ^ 128`.
 -/
 
 open OracleComp OracleSpec ENNReal Finset
@@ -54,14 +54,14 @@ theorem randInput_ne_msgInput (secretKey : Seeded.SecretKey) (message : Message)
     (randomness : Randomness) :
     randInput secretKey message trial ≠ msgInput secretKey message randomness := by
   intro h
-  have h' : fieldBytes ⟨7#8, 0#8, 0#32, BitVec.ofNat 32 trial, 0#32⟩ ++ bytesLE 16 secretKey.parameter
+  have h' : fieldBytes ⟨7#8, 0#8, 0#64, BitVec.ofNat 32 trial, 0#32⟩ ++ bytesLE 16 secretKey.parameter
         ++ (bytesLE 32 secretKey.seed ++ bytesLE 32 message)
       = fieldBytes (hashDomainFields .message) ++ bytesLE 16 secretKey.parameter
         ++ messageDigestPayload secretKey.root message randomness := by
     simpa only [randInput, msgInput, randomizerHashInput, tweakableHashInput, tweakBytes,
       List.append_assoc] using h
   exact fieldInput_ne_of_tag_ne secretKey.parameter
-    (fields1 := ⟨7#8, 0#8, 0#32, BitVec.ofNat 32 trial, 0#32⟩)
+    (fields1 := ⟨7#8, 0#8, 0#64, BitVec.ofNat 32 trial, 0#32⟩)
     (fields2 := hashDomainFields .message) (by simp [hashDomainFields, tweakFields]) _ _ h'
 
 theorem cached_run (input : HashInput) (cache : QueryCache HashSpec) (answer : HashOutput)
@@ -74,7 +74,7 @@ noncomputable def digestReject : ℝ≥0∞ :=
   Pr[fun u : HashOutput => ¬ Admissible (truncateMessageDigest u) |
     ($ᵗ HashOutput : ProbComp HashOutput)]
 
-theorem digestReject_add : digestReject + (1024 : ℝ≥0∞)⁻¹ = 1 := by
+theorem digestReject_add : digestReject + (256 : ℝ≥0∞)⁻¹ = 1 := by
   have h := probEvent_compl ($ᵗ HashOutput : ProbComp HashOutput)
     (fun u => Admissible (truncateMessageDigest u))
   have hfail : Pr[⊥ | ($ᵗ HashOutput : ProbComp HashOutput)] = 0 := by simp

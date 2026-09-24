@@ -181,7 +181,8 @@ theorem Compatible.layer_reference {inputs : Finset HashInput} {context : Contex
         simpa only [PublicEncodingMatch.referenceInput, hselected, Option.map_some, Option.some.injEq] using hreference
       have hpayload := (tweakableHashInput_injective context.key.parameter (by trivial) (by trivial) hinput).2
       obtain ⟨hmessage, hcounter⟩ := List.append_inj hpayload (by simp [digestBytes_length])
-      exact ⟨selected, rfl, (digestBytes_injective hmessage).symm, (bytesLE_injective hcounter).symm, hvalues, hpath⟩
+      exact ⟨selected, rfl, (digestBytes_injective hmessage).symm,
+        (counterBytes_injective hcounter).symm, hvalues, hpath⟩
 
 theorem Compatible.ftsTree_honest {inputs : Finset HashInput} {context : Context inputs} {memory : Memory}
     (hcompatible : Compatible context memory) (index : Index) (leaves : IndexGroup → FtsLeaf)

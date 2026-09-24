@@ -20,11 +20,11 @@ open Concrete Seeded
 def encodeInput (parameter : PublicParameter) (lay : Layer) (tree : TreeIndex) (leaf : LeafIndex)
     (message : Digest) (c : Nat) : HashInput :=
   tweakableHashInput parameter (.encoding lay tree leaf)
-    (bytesLE 16 message ++ bytesLE 4 (BitVec.ofNat counterBits c))
+    (bytesLE 16 message ++ counterBytes (BitVec.ofNat counterBits c))
 
 theorem encodeInput_inj (parameter : PublicParameter) (lay : Layer) (tree : TreeIndex)
     (leaf : LeafIndex) (message : Digest) {c c' : Nat}
-    (hc : c < 2 ^ 32) (hc' : c' < 2 ^ 32)
+    (hc : c < 2 ^ counterBits) (hc' : c' < 2 ^ counterBits)
     (h : encodeInput parameter lay tree leaf message c
       = encodeInput parameter lay tree leaf message c') : c = c' := by
   simp only [encodeInput, tweakableHashInput, List.append_assoc] at h
@@ -43,7 +43,9 @@ theorem probEvent_otsSign (parameter : PublicParameter) (lay : Layer) (tree : Tr
       ≤ failMass (fun out => TargetSum.decodeDigest (truncateHash out)) ^ encodingAttemptLimit := by
   rw [otsSign, otsSignFrom_eq_searchLoop]
   exact probEvent_searchLoop _ _ _ encodingAttemptLimit
-    (fun s s' hs hs' heq => encodeInput_inj parameter lay tree leaf message hs hs' heq)
+    (fun s s' hs hs' heq => encodeInput_inj parameter lay tree leaf message
+      (lt_of_lt_of_le hs (by decide : encodingAttemptLimit ≤ 2 ^ counterBits))
+      (lt_of_lt_of_le hs' (by decide : encodingAttemptLimit ≤ 2 ^ counterBits)) heq)
     encodingAttemptLimit 0 (by simp) cache (fun s _ hsb => hfresh s hsb)
 
 end SphincsSecurity.Completeness

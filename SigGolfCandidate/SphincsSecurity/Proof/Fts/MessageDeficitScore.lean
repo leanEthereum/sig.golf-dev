@@ -22,7 +22,7 @@ theorem cachedMessageEntryCountWhere_ne_top_of_finite (parameter : PublicParamet
 noncomputable def messageDeficitScore (parameter : PublicParameter) (root : Digest) (message : Message)
     (cache : QueryCache HashSpec) : ℝ :=
   (cachedMessageEntryCount cache parameter root message).toReal -
-    1024 * (cachedMessageEntryCountWhere cache parameter root message (fun _ => True)).toReal
+    256 * (cachedMessageEntryCountWhere cache parameter root message (fun _ => True)).toReal
 
 theorem messageDeficitScore_of_no_inputs (parameter : PublicParameter) (root : Digest) (message : Message)
     (cache : QueryCache HashSpec) (hcount : cachedMessageEntryCount cache parameter root message = 0) :
@@ -33,7 +33,7 @@ theorem messageDeficitScore_of_no_inputs (parameter : PublicParameter) (root : D
 theorem messageDeficitScore_ofReal_eq (key : SecretKey) (message : Message)
     (cache : QueryCache HashSpec) (hfinite : Finite cache) :
     ENNReal.ofReal (messageDeficitScore key.parameter key.root message cache) =
-      1024 * Concrete.messageAdmissibleDeficit key message cache := by
+      256 * Concrete.messageAdmissibleDeficit key message cache := by
   have hcount := cachedMessageEntryCount_ne_top_of_finite key.parameter key.root message cache hfinite
   have hadmissible := cachedMessageEntryCountWhere_ne_top_of_finite key.parameter key.root message cache hfinite (fun _ => True)
   rw [messageDeficitScore, ENNReal.ofReal_sub _ (mul_nonneg (by norm_num) ENNReal.toReal_nonneg),
@@ -44,7 +44,7 @@ theorem messageDeficitScore_ofReal_eq (key : SecretKey) (message : Message)
   norm_num [ftsTreeHeight]
   congr 1
   calc
-    _ = cachedMessageEntryCount cache key.parameter key.root message * ((1024 : ENNReal)⁻¹ * 1024) := by
+    _ = cachedMessageEntryCount cache key.parameter key.root message * ((256 : ENNReal)⁻¹ * 256) := by
       rw [ENNReal.inv_mul_cancel (by norm_num) (by finiteness), mul_one]
     _ = _ := by ring
 

@@ -29,6 +29,16 @@ theorem bytesLE_injective {n : Nat} {x y : BitVec (8 * n)} (h : bytesLE n x = by
 theorem bytesLE_length (n : Nat) (x : BitVec (8 * n)) : (bytesLE n x).length = n := by
   simp [bytesLE]
 
+theorem counterBytes_injective {left right : Counter}
+    (h : Concrete.counterBytes left = Concrete.counterBytes right) : left = right := by
+  have hv := congrArg BitVec.toNat (bytesLE_injective h)
+  have hl := left.isLt
+  have hr := right.isLt
+  simp only [Concrete.counterBytes, BitVec.toNat_ofNat] at hv
+  norm_num [counterBits] at hl hr hv
+  apply BitVec.toNat_injective
+  omega
+
 /-- A bit vector determines the natural it encodes, below the wrap. -/
 theorem ofNat_inj_of_lt {w a b : Nat} (ha : a < 2 ^ w) (hb : b < 2 ^ w)
     (h : BitVec.ofNat w a = BitVec.ofNat w b) : a = b := by
@@ -53,8 +63,8 @@ theorem tweakBytes_eq_iff {d1 d2 : HashDomain} :
   ⟨fun h => fieldBytes_injective h, fun h => by rw [tweakBytes, tweakBytes, h]⟩
 
 private theorem layer_le : numLayers ≤ 2 ^ 8 := by decide
-private theorem tree_le : 2 ^ totalHeight ≤ 2 ^ 32 := Nat.pow_le_pow_right (by omega) (by decide)
-private theorem index_le : 2 ^ totalHeight ≤ 2 ^ 32 := tree_le
+private theorem tree_le : 2 ^ totalHeight ≤ 2 ^ 64 := Nat.pow_le_pow_right (by omega) (by decide)
+private theorem index_le : 2 ^ totalHeight ≤ 2 ^ 64 := tree_le
 private theorem leaf_le : 2 ^ maxLayerHeight ≤ 2 ^ 32 := Nat.pow_le_pow_right (by omega) (by decide)
 private theorem ftsTree_le : ftsTrees - 1 ≤ 2 ^ 8 := by decide
 private theorem ftsLeaf_le : 2 ^ ftsTreeHeight ≤ 2 ^ 32 := Nat.pow_le_pow_right (by omega) (by decide)
@@ -98,7 +108,7 @@ theorem tweakBytes_injective {d1 d2 : HashDomain} (h1 : d1.InRange) (h2 : d2.InR
       ofNat_inj_of_lt h1.1 h2.1 h.2.2.1, ofNat_inj_of_lt h1.2 h2.2 h.2.2.2⟩
   case ftsRoots.ftsRoots => exact fin_of_ofNat_eq index_le h
 
-theorem tweakBytes_length (domain : HashDomain) : (tweakBytes domain).length = 16 := by
+theorem tweakBytes_length (domain : HashDomain) : (tweakBytes domain).length = 20 := by
   simp [tweakBytes, fieldBytes, bytesLE_length]
 
 /-- What the reduction reads off a query: the tweak is a fixed-length prefix of the hashed input, so

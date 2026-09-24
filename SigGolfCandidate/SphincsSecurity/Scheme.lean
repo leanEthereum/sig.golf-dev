@@ -18,24 +18,24 @@ def hashOutputBits : Nat := 256
 def messageBits : Nat := 256
 def publicParameterBits : Nat := 128
 def randomnessBits : Nat := 128
-def counterBits : Nat := 32
+def counterBits : Nat := 19
 def winternitzBits : Nat := 3
 def chainLength : Nat := 2 ^ winternitzBits
 def numChains : Nat := 42
-def targetSum : Nat := 191
-def numLayers : Nat := 3
-def totalHeight : Nat := 26
+def targetSum : Nat := 170
+def numLayers : Nat := 5
+def totalHeight : Nat := 34
 /-- The tallest layer, `h_0`, which bounds every layer's leaf index. -/
-def maxLayerHeight : Nat := 12
-def ftsTreeHeight : Nat := 10
+def maxLayerHeight : Nat := 11
+def ftsTreeHeight : Nat := 8
 /-- The `k` index groups a digest carries. The forest holds `k - 1` trees, the last group being pinned to zero. -/
-def ftsTrees : Nat := 15
+def ftsTrees : Nat := 21
 /-- Signatures allowed per key pair, `q_s`. -/
-def signatureLimit : Nat := 2 ^ 24
+def signatureLimit : Nat := 2 ^ 32
 /-- Digest attempts per signature, `A_max`. -/
-def digestAttemptLimit : Nat := 2 ^ 32
+def digestAttemptLimit : Nat := 2 ^ 20
 /-- Encoding counters tried per layer, `C_max`. -/
-def encodingAttemptLimit : Nat := 2 ^ 32
+def encodingAttemptLimit : Nat := 2 ^ 19
 
 abbrev MasterSeed := BitVec 256
 
@@ -63,11 +63,13 @@ abbrev FtsLeaf := Fin (2 ^ ftsTreeHeight)
 abbrev Encoding := ChainIndex → Digit
 abbrev HashInput := List UInt8
 
-/-- The `d` Merkle heights, `(h_0, h_1, h_2) = (12, 7, 7)`. Layer `0` carries the public key. -/
-def layerHeight (lay : Layer) : Nat := if lay.val = 0 then maxLayerHeight else 7
+/-- The layer heights are `(11, 6, 6, 6, 5)`. -/
+def layerHeight (lay : Layer) : Nat := if lay.val = 0 then maxLayerHeight else if lay.val = 4 then 5 else 6
 
 def topLayer : Layer := ⟨0, by decide⟩
 def middleLayer : Layer := ⟨1, by decide⟩
+def middle2Layer : Layer := ⟨2, by decide⟩
+def middle3Layer : Layer := ⟨3, by decide⟩
 def bottomLayer : Layer := ⟨numLayers - 1, by decide⟩
 
 /-- `sum_{j < lay} h_j`, the index bits above layer `lay`. -/
@@ -80,7 +82,7 @@ def heightBelow (lay : Layer) : Nat := totalHeight - heightAbove lay - layerHeig
 def truncateHash (output : HashOutput) : Digest :=
   output.extractLsb' 0 digestBits
 
-/-- The message digest is `h + k * a = 176` bits, an index and `k` leaf indices. -/
+/-- The message digest carries 34 index bits and twenty-one eight-bit leaf groups, the last of which is pinned. -/
 def messageDigestBits : Nat := totalHeight + ftsTrees * ftsTreeHeight
 
 abbrev MessageDigest := BitVec messageDigestBits
@@ -102,7 +104,7 @@ structure LayerSignature (lay : Layer) where
   path : Fin (layerHeight lay) → Digest
 deriving DecidableEq
 
-/-- The randomizer, FORS openings, and three layer signatures, totaling 4924 bytes. -/
+/-- The randomizer, twenty FORS openings, and five layer signatures, totaling 6820 bytes. -/
 structure Signature where
   randomness : Randomness
   ftsSecret : FtsTree → Digest
@@ -119,7 +121,7 @@ def bytesLE (byteCount : Nat) (value : BitVec (8 * byteCount)) : List UInt8 :=
 structure TweakFields where
   tag : BitVec 8
   layer : BitVec 8
-  tree : BitVec 32
+  tree : BitVec 64
   position : BitVec 32
   index : BitVec 32
 deriving DecidableEq
@@ -127,14 +129,14 @@ deriving DecidableEq
 /-- The protocol domain separator. -/
 def protocolDomainSep : UInt8 := 1
 
-/-- The specification's 16 tweak bytes `protocol_domain_sep || tag || layer || 0 || position || tree || index`, each field serialized least significant byte first. -/
+/-- The 20 tweak bytes `protocol_domain_sep || tag || layer || 0 || position || tree || index`, each field serialized least significant byte first. -/
 def fieldBytes (fields : TweakFields) : HashInput :=
   [protocolDomainSep] ++ bytesLE 1 fields.tag ++ bytesLE 1 fields.layer ++ [0] ++
-    bytesLE 4 fields.position ++ bytesLE 4 fields.tree ++ bytesLE 4 fields.index
+    bytesLE 4 fields.position ++ bytesLE 8 fields.tree ++ bytesLE 4 fields.index
 
 /-- Convert the specification's five integer fields to their fixed widths. -/
 def tweakFields (tag layer tree position index : Nat) : TweakFields :=
-  ⟨BitVec.ofNat 8 tag, BitVec.ofNat 8 layer, BitVec.ofNat 32 tree,
+  ⟨BitVec.ofNat 8 tag, BitVec.ofNat 8 layer, BitVec.ofNat 64 tree,
     BitVec.ofNat 32 position, BitVec.ofNat 32 index⟩
 
 /-- The verification hash domains. Seed derivation uses `KeygenDomain`. -/
@@ -160,7 +162,7 @@ def hashDomainFields : HashDomain → TweakFields
   | .ftsRoots index => tweakFields 11 0 index 0 0
   | .message => tweakFields 12 0 0 0 0
 
-/-- The exact 16 bytes supplied by the specification as a hash tweak. -/
+/-- The exact 20 bytes supplied by the specification as a hash tweak. -/
 def tweakBytes (domain : HashDomain) : HashInput :=
   fieldBytes (hashDomainFields domain)
 
@@ -172,7 +174,7 @@ def tweakableHashInput (parameter : PublicParameter) (domain : HashDomain)
 /-- `tweak(7, 0, 0, trial, 0) || P || S || m`. -/
 def randomizerHashInput (parameter : PublicParameter) (seed : MasterSeed)
     (message : Message) (trial : BitVec 32) : HashInput :=
-  fieldBytes ⟨7#8, 0#8, 0#32, trial, 0#32⟩ ++
+  fieldBytes ⟨7#8, 0#8, 0#64, trial, 0#32⟩ ++
     bytesLE 16 parameter ++ bytesLE 32 seed ++ bytesLE 32 message
 
 inductive KeygenDomain where
@@ -193,7 +195,7 @@ def keygenHashInput (parameter : PublicParameter) (domain : KeygenDomain)
 
 /-! ### The target-sum code
 
-`v = 42` chunks of `w = 3` bits, 21 in each half of the digest, one pinned bit per half, and the code is the words of digit sum `T = 191`. Two distinct words of equal sum are incomparable, which is what removes the Winternitz checksum and the reason why we need the counter. -/
+`v = 42` chunks of `w = 3` bits, 21 in each half of the digest, one pinned bit per half, and the code is the words of digit sum `T = 170`. Two distinct words of equal sum are incomparable, which removes the Winternitz checksum. -/
 
 namespace TargetSum
 
@@ -269,7 +271,7 @@ def treeIndexAt (index : Index) (lay : Layer) : TreeIndex :=
 def leafIndexAt (index : Index) (lay : Layer) : LeafIndex :=
   ⟨index.val / 2 ^ heightBelow lay % 2 ^ layerHeight lay,
     Nat.lt_of_lt_of_le (Nat.mod_lt _ (Nat.two_pow_pos _)) (Nat.pow_le_pow_right (by omega) (by
-      unfold layerHeight maxLayerHeight; split <;> omega))⟩
+      simp only [layerHeight, maxLayerHeight]; split_ifs <;> omega))⟩
 
 /-! ### The one-time signature -/
 
@@ -307,7 +309,7 @@ def leafHash (parameter : PublicParameter) (lay : Layer) (tree : TreeIndex) (lea
 def encode (parameter : PublicParameter) (lay : Layer) (tree : TreeIndex) (leaf : LeafIndex)
     (message : Digest) (counter : Counter) : m (Option Encoding) := do
   let digest ← tweakableHash parameter (.encoding lay tree leaf)
-    (bytesLE 16 message ++ bytesLE 4 counter)
+    (bytesLE 16 message ++ bytesLE 4 (BitVec.ofNat 32 counter.toNat))
   return TargetSum.decodeDigest digest
 
 /-- `OtsLeaf`: the verifier's leaf, or nothing if the counter does not encode the message. -/
@@ -454,9 +456,12 @@ def rootTree : TreeIndex := ⟨0, Nat.two_pow_pos _⟩
 def sequenceLayers {α : Layer → Type}
     (computation : (lay : Layer) → m (Option (α lay))) : m (Option ((lay : Layer) → α lay)) := do
   let some bottom ← computation bottomLayer | return none
+  let some middle3 ← computation middle3Layer | return none
+  let some middle2 ← computation middle2Layer | return none
   let some middle ← computation middleLayer | return none
   let some top ← computation topLayer | return none
-  return some (Fin.cases top (Fin.cases middle (Fin.cases bottom (fun i => Fin.elim0 i))))
+  return some (Fin.cases top (Fin.cases middle
+    (Fin.cases middle2 (Fin.cases middle3 (Fin.cases bottom (fun i => Fin.elim0 i))))))
 
 attribute [irreducible] verify
 

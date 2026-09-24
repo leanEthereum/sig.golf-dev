@@ -155,15 +155,25 @@ def HypertreeRun (f : QueryImpl HashSpec Id) (cache : QueryCache HashSpec)
     (message target : Digest) : Prop :=
   ∃ bottomLeaf,
     LayerFrame f cache parameter index signature bottomLayer message target bottomLeaf
-      ∧ let middleMessage := foldValue f parameter bottomLayer
+      ∧ let middle3Message := foldValue f parameter bottomLayer
           (treeIndexAt index bottomLayer) (leafIndexAt index bottomLayer)
           (signaturePath signature bottomLayer) bottomLeaf (layerHeight bottomLayer)
-        ∃ middleLeaf,
-          LayerFrame f cache parameter index signature middleLayer middleMessage target middleLeaf
-            ∧ let topMessage := foldValue f parameter middleLayer
-                (treeIndexAt index middleLayer) (leafIndexAt index middleLayer)
-                (signaturePath signature middleLayer) middleLeaf (layerHeight middleLayer)
-              LayerRun f cache parameter index signature topLayer topMessage target
+        ∃ middle3Leaf,
+          LayerFrame f cache parameter index signature middle3Layer middle3Message target middle3Leaf
+            ∧ let middle2Message := foldValue f parameter middle3Layer
+                (treeIndexAt index middle3Layer) (leafIndexAt index middle3Layer)
+                (signaturePath signature middle3Layer) middle3Leaf (layerHeight middle3Layer)
+              ∃ middle2Leaf,
+                LayerFrame f cache parameter index signature middle2Layer middle2Message target middle2Leaf
+                  ∧ let middleMessage := foldValue f parameter middle2Layer
+                      (treeIndexAt index middle2Layer) (leafIndexAt index middle2Layer)
+                      (signaturePath signature middle2Layer) middle2Leaf (layerHeight middle2Layer)
+                    ∃ middleLeaf,
+                      LayerFrame f cache parameter index signature middleLayer middleMessage target middleLeaf
+                        ∧ let topMessage := foldValue f parameter middleLayer
+                            (treeIndexAt index middleLayer) (leafIndexAt index middleLayer)
+                            (signaturePath signature middleLayer) middleLeaf (layerHeight middleLayer)
+                          LayerRun f cache parameter index signature topLayer topMessage target
 
 theorem hypertreeRun_of_verify (index : Index) (signature : Signature)
     (message target : Digest)
@@ -176,13 +186,29 @@ theorem hypertreeRun_of_verify (index : Index) (signature : Signature)
     message target (by simpa only [numLayers, bottomLayer] using hverify)
     (by simpa only [numLayers, bottomLayer] using hrun)
   obtain ⟨bottomLeaf, hbottom⟩ := hbottom
-  let middleMessage := foldValue f parameter bottomLayer
+  let middle3Message := foldValue f parameter bottomLayer
     (treeIndexAt index bottomLayer) (leafIndexAt index bottomLayer)
     (signaturePath signature bottomLayer) bottomLeaf (layerHeight bottomLayer)
+  have hmiddle3 := layerRun_of_verify (f := f) (cache := cache) index signature middle3Layer
+    middle3Message target (by
+      simpa only [middle3Message, bottomLayer, middle3Layer, numLayers] using hbottom.2.1)
+    (by simpa only [middle3Message, bottomLayer, middle3Layer, numLayers] using hbottom.2.2.2.2)
+  obtain ⟨middle3Leaf, hmiddle3⟩ := hmiddle3
+  let middle2Message := foldValue f parameter middle3Layer
+    (treeIndexAt index middle3Layer) (leafIndexAt index middle3Layer)
+    (signaturePath signature middle3Layer) middle3Leaf (layerHeight middle3Layer)
+  have hmiddle2 := layerRun_of_verify (f := f) (cache := cache) index signature middle2Layer
+    middle2Message target (by
+      simpa only [middle2Message, middle3Layer, middle2Layer, numLayers] using hmiddle3.2.1)
+    (by simpa only [middle2Message, middle3Layer, middle2Layer, numLayers] using hmiddle3.2.2.2.2)
+  obtain ⟨middle2Leaf, hmiddle2⟩ := hmiddle2
+  let middleMessage := foldValue f parameter middle2Layer
+    (treeIndexAt index middle2Layer) (leafIndexAt index middle2Layer)
+    (signaturePath signature middle2Layer) middle2Leaf (layerHeight middle2Layer)
   have hmiddle := layerRun_of_verify (f := f) (cache := cache) index signature middleLayer
     middleMessage target (by
-      simpa only [middleMessage, bottomLayer, middleLayer, numLayers] using hbottom.2.1)
-    (by simpa only [middleMessage, bottomLayer, middleLayer, numLayers] using hbottom.2.2.2.2)
+      simpa only [middleMessage, middle2Layer, middleLayer, numLayers] using hmiddle2.2.1)
+    (by simpa only [middleMessage, middle2Layer, middleLayer, numLayers] using hmiddle2.2.2.2.2)
   obtain ⟨middleLeaf, hmiddle⟩ := hmiddle
   let topMessage := foldValue f parameter middleLayer
     (treeIndexAt index middleLayer) (leafIndexAt index middleLayer)
@@ -190,7 +216,7 @@ theorem hypertreeRun_of_verify (index : Index) (signature : Signature)
   have htop := layerRun_of_verify (f := f) (cache := cache) index signature topLayer
     topMessage target (by simpa only [topMessage, middleLayer, topLayer] using hmiddle.2.1)
     (by simpa only [topMessage, middleLayer, topLayer] using hmiddle.2.2.2.2)
-  exact ⟨bottomLeaf, hbottom, middleLeaf, hmiddle, htop⟩
+  exact ⟨bottomLeaf, hbottom, middle3Leaf, hmiddle3, middle2Leaf, hmiddle2, middleLeaf, hmiddle, htop⟩
 
 def HonestLayerOpening (f : QueryImpl HashSpec Id) (parameter : PublicParameter)
     (otsSecret : Layer → TreeIndex → LeafIndex → ChainIndex → Digest)

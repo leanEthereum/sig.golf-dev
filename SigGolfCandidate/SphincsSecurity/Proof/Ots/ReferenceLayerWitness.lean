@@ -29,7 +29,8 @@ theorem equal_word_reference (lay : Layer) (tree : TreeIndex) (leaf : LeafIndex)
           simpa only [PublicEncodingMatch.referenceInput, hselected, Option.map_some, Option.some.injEq] using hreference
         have hpayload := (tweakableHashInput_injective parameter (by trivial) (by trivial) hinput).2
         obtain ⟨hm, hc⟩ := List.append_inj hpayload (by simp [digestBytes_length])
-        exact Or.inl ⟨selected, rfl, (digestBytes_injective hm).symm, (bytesLE_injective hc).symm⟩
+        exact Or.inl ⟨selected, rfl, (digestBytes_injective hm).symm,
+          (counterBytes_injective hc).symm⟩
   · refine Or.inr ⟨(input, f input), ?_, ?_, position, ⟨_, rfl⟩, hreference, ?_⟩
     · apply hrun.bind_left
       simp only [encodeAttempt, queriedInputs_bind, queriedInputs_tweakableHash, queriedInputs_pure,

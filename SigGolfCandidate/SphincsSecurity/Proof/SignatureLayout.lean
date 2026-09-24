@@ -7,7 +7,7 @@ namespace SphincsSecurity
 
 theorem layerHeight_le (lay : Layer) : layerHeight lay ≤ maxLayerHeight := by
   unfold layerHeight maxLayerHeight
-  split <;> omega
+  split_ifs <;> omega
 
 abbrev Signature.counter (signature : Signature) (lay : Layer) : Counter :=
   (signature.layers lay).counter

@@ -31,7 +31,13 @@ theorem encodingRetryInput_injective_of_lt
     (tweakableHashInput_injective parameter (by trivial) (by trivial) heq).2
   obtain ⟨_, hcounter⟩ :=
     List.append_inj hpayload (by simp [digestBytes_length])
-  apply ofNat_inj_of_lt (w := counterBits)
-    (by simpa [encodingAttemptLimit, counterBits] using hleft)
-    (by simpa [encodingAttemptLimit, counterBits] using hright)
-  exact bytesLE_injective hcounter
+  have hleft19 : left < 2 ^ counterBits :=
+    lt_of_lt_of_le hleft (by decide : encodingAttemptLimit ≤ 2 ^ counterBits)
+  have hright19 : right < 2 ^ counterBits :=
+    lt_of_lt_of_le hright (by decide : encodingAttemptLimit ≤ 2 ^ counterBits)
+  have hleft32 : left < 2 ^ 32 := lt_of_lt_of_le hleft19 (by decide)
+  have hright32 : right < 2 ^ 32 := lt_of_lt_of_le hright19 (by decide)
+  have hv := congrArg BitVec.toNat (bytesLE_injective hcounter)
+  simp only [counterBytes, BitVec.toNat_ofNat] at hv
+  norm_num [counterBits] at hleft19 hright19 hleft32 hright32 hv
+  omega

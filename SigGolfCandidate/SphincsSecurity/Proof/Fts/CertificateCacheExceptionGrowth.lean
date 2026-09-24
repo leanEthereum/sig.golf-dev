@@ -8,26 +8,26 @@ attribute [local irreducible] messageDeficitMoment cachedIndexExcessMoment posit
 set_option backward.isDefEq.respectTransparency false
 
 noncomputable def certificateCacheExceptionWeight (key : SecretKey) (cache : QueryCache HashSpec) : ENNReal :=
-  messageDeficitMoment key.parameter key.root cache 2 / 2 ^ 186 + cachedIndexExcessMoment key.parameter cache / 2 ^ 160
+  messageDeficitMoment key.parameter key.root cache 2 / 2 ^ 182 + cachedIndexExcessMoment key.parameter cache / 2 ^ 148
 
-noncomputable def certificateCacheExceptionRate : ENNReal := 1023 / 2 ^ 186 + (2 ^ 10 : ENNReal)⁻¹ / 2 ^ 160
+noncomputable def certificateCacheExceptionRate : ENNReal := 255 / 2 ^ 182 + (2 ^ 8 : ENNReal)⁻¹ / 2 ^ 148
 
-theorem certificateCacheExceptionRate_le : certificateCacheExceptionRate ≤ (2 ^ 169 : ENNReal)⁻¹ := by
+theorem certificateCacheExceptionRate_le : certificateCacheExceptionRate ≤ (2 ^ 155 : ENNReal)⁻¹ := by
   apply (ENNReal.toReal_le_toReal (by unfold certificateCacheExceptionRate; finiteness) (by finiteness)).mp
   rw [certificateCacheExceptionRate, ENNReal.toReal_add (by finiteness) (by finiteness)]
   norm_num [ENNReal.toReal_div, ENNReal.toReal_inv, ENNReal.toReal_pow]
 
 theorem messageDeficitExceptional_secondMoment_le (key : SecretKey) (cache : QueryCache HashSpec)
     (hfinite : Finite cache) (hbad : MessageDeficitExceptional key cache) :
-    (2 : ENNReal) ^ 186 ≤ messageDeficitMoment key.parameter key.root cache 2 := by
+    (2 : ENNReal) ^ 182 ≤ messageDeficitMoment key.parameter key.root cache 2 := by
   obtain ⟨message, hmessage⟩ := hbad
-  have hscaled : (2 : ENNReal) ^ 93 ≤ 1024 * messageAdmissibleDeficit key message cache := by
+  have hscaled : (2 : ENNReal) ^ 91 ≤ 256 * messageAdmissibleDeficit key message cache := by
     calc
-      _ = 1024 * ((2 ^ 83 : Nat) : ENNReal) := by norm_num
+      _ = 256 * ((2 ^ 83 : Nat) : ENNReal) := by norm_num
       _ ≤ _ := mul_le_mul' le_rfl hmessage.le
   calc
-    _ = ((2 : ENNReal) ^ 93) ^ 2 := by rw [← pow_mul]
-    _ ≤ (1024 * messageAdmissibleDeficit key message cache) ^ 2 := pow_le_pow_left' hscaled 2
+    _ = ((2 : ENNReal) ^ 91) ^ 2 := by rw [← pow_mul]
+    _ ≤ (256 * messageAdmissibleDeficit key message cache) ^ 2 := pow_le_pow_left' hscaled 2
     _ = positiveScoreMoment (messageDeficitScore key.parameter key.root message cache) 2 := by
       rw [positiveScoreMoment_eq_pow_ofReal, messageDeficitScore_ofReal_eq key message cache hfinite]
     _ ≤ _ := positiveScoreMoment_le_messageDeficitMoment key.parameter key.root cache 2 message
@@ -35,13 +35,13 @@ theorem messageDeficitExceptional_secondMoment_le (key : SecretKey) (cache : Que
 theorem certificateCacheExceptionWeight_bad (key : SecretKey) (cache : QueryCache HashSpec)
     (hfinite : Finite cache) (hbad : CertificateCacheExceptional key cache) : 1 ≤ certificateCacheExceptionWeight key cache := by
   rcases hbad with hdeficit | hindex
-  · apply le_trans (b := messageDeficitMoment key.parameter key.root cache 2 / 2 ^ 186) _ le_self_add
+  · apply le_trans (b := messageDeficitMoment key.parameter key.root cache 2 / 2 ^ 182) _ le_self_add
     calc
-      1 = (2 ^ 186 : ENNReal) / 2 ^ 186 := (ENNReal.div_self (by positivity) (by finiteness)).symm
+      1 = (2 ^ 182 : ENNReal) / 2 ^ 182 := (ENNReal.div_self (by positivity) (by finiteness)).symm
       _ ≤ _ := ENNReal.div_le_div_right (messageDeficitExceptional_secondMoment_le key cache hfinite hdeficit) _
-  · apply le_trans (b := cachedIndexExcessMoment key.parameter cache / 2 ^ 160) _ le_add_self
+  · apply le_trans (b := cachedIndexExcessMoment key.parameter cache / 2 ^ 148) _ le_add_self
     calc
-      1 = (2 ^ 160 : ENNReal) / 2 ^ 160 := (ENNReal.div_self (by positivity) (by finiteness)).symm
+      1 = (2 ^ 148 : ENNReal) / 2 ^ 148 := (ENNReal.div_self (by positivity) (by finiteness)).symm
       _ ≤ _ := ENNReal.div_le_div_right (cachedIndexExcessExceptional_moment_ge key.parameter cache hindex) _
 
 theorem certificateCacheExceptionWeight_initial (key : SecretKey) (cache : QueryCache HashSpec)

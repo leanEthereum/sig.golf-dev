@@ -15,11 +15,11 @@ namespace SphincsSecurity
 open OracleComp
 
 /-- What follows the tweak and the parameter in a hash input. -/
-def payloadOf (input : HashInput) : HashInput := input.drop 32
+def payloadOf (input : HashInput) : HashInput := input.drop 36
 
 theorem payloadOf_tweakableHashInput (parameter : PublicParameter) (domain : HashDomain)
     (payload : HashInput) : payloadOf (tweakableHashInput parameter domain payload) = payload := by
-  have hlength : (tweakBytes domain ++ bytesLE 16 parameter).length = 32 := by
+  have hlength : (tweakBytes domain ++ bytesLE 16 parameter).length = 36 := by
     have hparameter : (bytesLE 16 parameter).length = 16 := bytesLE_length 16 parameter
     simp [tweakBytes_length, hparameter]
   simp only [payloadOf, tweakableHashInput]

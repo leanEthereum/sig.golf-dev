@@ -236,10 +236,16 @@ theorem avoidsMessage_signAfterDigest (f : QueryImpl HashSpec Id) (secretKey : S
   · unfold sequenceLayers
     apply AvoidsMessageQueries.bind (avoidsMessage_signLayer f secretKey index bottomLayer)
     split
-    · apply AvoidsMessageQueries.bind (avoidsMessage_signLayer f secretKey index middleLayer)
+    · apply AvoidsMessageQueries.bind (avoidsMessage_signLayer f secretKey index middle3Layer)
       split
-      · apply AvoidsMessageQueries.bind (avoidsMessage_signLayer f secretKey index topLayer)
-        split <;> exact AvoidsMessageQueries.pure secretKey.parameter f _
+      · apply AvoidsMessageQueries.bind (avoidsMessage_signLayer f secretKey index middle2Layer)
+        split
+        · apply AvoidsMessageQueries.bind (avoidsMessage_signLayer f secretKey index middleLayer)
+          split
+          · apply AvoidsMessageQueries.bind (avoidsMessage_signLayer f secretKey index topLayer)
+            split <;> exact AvoidsMessageQueries.pure secretKey.parameter f _
+          · exact AvoidsMessageQueries.pure secretKey.parameter f _
+        · exact AvoidsMessageQueries.pure secretKey.parameter f _
       · exact AvoidsMessageQueries.pure secretKey.parameter f _
     · exact AvoidsMessageQueries.pure secretKey.parameter f _
   · split

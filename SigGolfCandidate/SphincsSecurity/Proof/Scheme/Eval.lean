@@ -37,10 +37,12 @@ theorem evalWithAnswerFn_sequenceLayers (computation : Layer → OracleComp Hash
     evalWithAnswerFn f (sequenceLayers computation) =
       sequenceFin (m := Option) (fun lay => evalWithAnswerFn f (computation lay)) := by
   cases hb : evalWithAnswerFn f (computation bottomLayer) <;>
+    cases hm3 : evalWithAnswerFn f (computation middle3Layer) <;>
+    cases hm2 : evalWithAnswerFn f (computation middle2Layer) <;>
     cases hm : evalWithAnswerFn f (computation middleLayer) <;>
     cases ht : evalWithAnswerFn f (computation topLayer) <;>
     simp [sequenceLayers, sequenceFin, evalWithAnswerFn_bind,
-      bottomLayer, middleLayer, topLayer, numLayers] at hb hm ht ⊢ <;>
-    simp [hb, hm, ht] <;> rfl
+      bottomLayer, middle3Layer, middle2Layer, middleLayer, topLayer, numLayers] at hb hm3 hm2 hm ht ⊢ <;>
+    simp [hb, hm3, hm2, hm, ht] <;> rfl
 
 end SphincsSecurity.Concrete

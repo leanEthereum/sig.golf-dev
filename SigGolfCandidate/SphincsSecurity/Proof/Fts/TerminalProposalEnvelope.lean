@@ -41,7 +41,7 @@ theorem targetProposalPrefix_length_le (completed total : Nat) (consumed : List 
     _ ≤ targetProposalOverhead * completed + (proposalPrefixSlack : ENNReal) := hprefix
     _ ≤ targetProposalOverhead * signatureLimit + (proposalPrefixSlack : ENNReal) :=
       add_le_add (mul_le_mul' le_rfl (Nat.cast_le.mpr hcompleted)) le_rfl
-    _ ≤ targetProposalOverhead * signatureLimit + (proposalPrefixSlack : ENNReal) + 13 := le_self_add
+    _ ≤ targetProposalOverhead * signatureLimit + (proposalPrefixSlack : ENNReal) + 19 := le_self_add
     _ = (fixedProposalLength : ENNReal) := targetProposalPoolMinimum_eq
     _ ≤ (total : ENNReal) := by exact_mod_cast htotal
 
@@ -50,7 +50,7 @@ theorem reuseRawEnvelope_le_terminalProposalPotential (key : SecretKey)
     (consumed : List Index) (hqueries : spent + queries ≤ 2 ^ 127)
     (hcompleted : completed ≤ signatureLimit)
     (hcache : ∀ index : Index, cachedIndexMultiplicity key.parameter state.1 index ≤
-      (spent : ENNReal) * ((2 ^ 36 : Nat) : ENNReal)⁻¹ + ((2 ^ 80 : Nat) : ENNReal))
+      (spent : ENNReal) * ((2 ^ 42 : Nat) : ENNReal)⁻¹ + ((2 ^ 74 : Nat) : ENNReal))
     (hcounts : ∀ index : Index,
       (signingSlotsAtIndex (observedOptionalSigningViews
         (FtsProbeSimulation.messageAnswers key.parameter state.1) key.root state.2) index).card ≤ consumed.count index)
@@ -69,7 +69,7 @@ theorem targetCreationPrice_le_terminalProposalPotential (key : SecretKey)
     (consumed : List Index) (hqueries : spent + queries ≤ 2 ^ 127)
     (hcompleted : completed ≤ signatureLimit)
     (hcache : ∀ index : Index, cachedIndexMultiplicity key.parameter state.1 index ≤
-      (spent : ENNReal) * ((2 ^ 36 : Nat) : ENNReal)⁻¹ + ((2 ^ 80 : Nat) : ENNReal))
+      (spent : ENNReal) * ((2 ^ 42 : Nat) : ENNReal)⁻¹ + ((2 ^ 74 : Nat) : ENNReal))
     (hcounts : ∀ index : Index,
       (signingSlotsAtIndex (observedOptionalSigningViews
         (FtsProbeSimulation.messageAnswers key.parameter state.1) key.root state.2) index).card ≤ consumed.count index)

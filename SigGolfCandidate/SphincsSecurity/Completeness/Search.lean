@@ -1,4 +1,4 @@
-import SigGolfCandidate.SphincsSecurity.Scheme
+import SigGolfCandidate.SphincsSecurity.Proof.Ots.Code
 
 /-!
 # Exhausting a search
@@ -52,7 +52,7 @@ theorem fresh_run (input : HashInput) (cache : QueryCache HashSpec) (hfresh : ca
     from rfl, probEvent_bind_eq_tsum]
   exact tsum_congr fun u => by rw [probOutput_uniformSample]
 
-/-- A search over fresh inputs, distinct below `bound`, exhausts all `n` trials with probability at most the per-trial rejection share to the `n`. The bound is what the counter search needs: its inputs carry a 32-bit counter, so they repeat only after `2 ^ 32` trials, which is exactly its trial budget. -/
+/-- A search over fresh inputs, distinct below `bound`, exhausts all `n` trials with probability at most the per-trial rejection share to the `n`. -/
 theorem probEvent_searchLoop (inputs : Nat → HashInput) (decode : HashOutput → Option β)
     (success : Nat → β → OracleComp HashSpec γ) (bound : Nat)
     (hinj : ∀ s s', s < bound → s' < bound → inputs s = inputs s' → s = s') :
@@ -165,12 +165,13 @@ theorem bytesLE_inj {n : Nat} {x y : BitVec (8 * n)} (h : bytesLE n x = bytesLE 
   simpa [hmod, hsum] using hlsb
 
 /-- Counter inputs below the wrap are distinct. -/
-theorem counter_bytes_inj {c c' : Nat} (hc : c < 2 ^ 32) (hc' : c' < 2 ^ 32)
-    (h : (bytesLE 4 (BitVec.ofNat counterBits c) : HashInput)
-        = bytesLE 4 (BitVec.ofNat counterBits c')) : c = c' := by
+theorem counter_bytes_inj {c c' : Nat} (hc : c < 2 ^ counterBits) (hc' : c' < 2 ^ counterBits)
+    (h : Concrete.counterBytes (BitVec.ofNat counterBits c)
+        = Concrete.counterBytes (BitVec.ofNat counterBits c')) : c = c' := by
   have hv := congrArg BitVec.toNat (bytesLE_inj h)
-  simp only [BitVec.toNat_ofNat, counterBits] at hv
-  rwa [Nat.mod_eq_of_lt hc, Nat.mod_eq_of_lt hc'] at hv
+  simp only [Concrete.counterBytes, BitVec.toNat_ofNat] at hv
+  norm_num [counterBits] at hc hc' hv
+  omega
 
 /-! ## The counter search
 
@@ -187,7 +188,7 @@ theorem otsSignFrom_eq_searchLoop (parameter : PublicParameter) (lay : Layer) (t
         : OracleComp HashSpec (Option (Counter × (ChainIndex → Digest))))
         = searchLoop
             (fun c => tweakableHashInput parameter (.encoding lay tree leaf)
-              (bytesLE 16 message ++ bytesLE 4 (BitVec.ofNat counterBits c)))
+              (bytesLE 16 message ++ Concrete.counterBytes (BitVec.ofNat counterBits c)))
             (fun out => TargetSum.decodeDigest (truncateHash out))
             (fun c encoding => do
               let values ← sequenceFin fun chainIdx => do
