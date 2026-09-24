@@ -7,7 +7,7 @@ open SigGolf SigGolf.Riscv RiscvZkvm.Rv64 OracleComp
 deriving instance DecidableEq for SigGolf.Riscv.Instruction
 
 namespace Expansion
-private def expand : Image := SphincsImages.expand
+def expand : Image := SphincsImages.expand
 set_option maxRecDepth 4096
 set_option Elab.async false
 
