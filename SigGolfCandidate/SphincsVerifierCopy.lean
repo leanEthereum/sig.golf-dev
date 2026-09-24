@@ -156,6 +156,25 @@ theorem copyRoot_block (state : MachineState) (pc : state.pc = 0x1060)
   simpa [copyRootState, s1, s2, s3, s4, s5] using
     (((b0.append b1).append b2).append b3).append b4
 
+theorem copyRoot_pc (state : MachineState) (pc : state.pc = 0x1060) :
+    (copyRootState state).pc = 0x1088 := by
+  have p1 := copyWord_pc 0 state (by simpa using pc)
+  have p2 := copyWord_pc 1 (copyWordState 0 state) (by simpa using p1)
+  have p3 := copyWord_pc 2 (copyWordState 1 (copyWordState 0 state))
+    (by simpa using p2)
+  have p4 := copyWord_pc 3
+    (copyWordState 2 (copyWordState 1 (copyWordState 0 state)))
+    (by simpa using p3)
+  have p5 := copyWord_pc 4
+    (copyWordState 3 (copyWordState 2 (copyWordState 1 (copyWordState 0 state))))
+    (by simpa using p4)
+  simpa [copyRootState] using p5
+
+theorem copyRoot_pointers (state : MachineState) :
+    (copyRootState state).getReg .x6 = state.getReg .x6 ∧
+      (copyRootState state).getReg .x7 = state.getReg .x7 := by
+  simp [copyRootState, copyWord_pointers]
+
 def setupAndRootState (state : MachineState) : MachineState :=
   copyRootState (addressSetupState
     (SphincsVerifierSlots.headerState (execInstrBr state (.JAL .x0 16))))
