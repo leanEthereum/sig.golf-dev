@@ -106,7 +106,9 @@ Stop at the first failure. We say the `experiment succeeds` when all stages succ
 1. **Success:** for every secret key, `Pr_H[experiment succeeds for every message] >= 1 - FAILURE`.
 2. **Compression budgets:** for every secret key and P in {`keygen`, `sign`, `expand`}, `E_{H,M}[2^(K_P / BUDGET_P)] <= 2`.
 
-`Pr_H` is over H; `E_{H,M}` is over an independently sampled random oracle H and uniform 32-byte message M. Attacker-chosen messages or altered caches/signatures may cost more. TODO: Can we improve this?
+`Pr_H` is over H; `E_{H,M}` is over an independently sampled random oracle H and uniform 32-byte message M.
+
+**Remark.** After H is fixed, adaptively chosen messages may cost much more than this average. Any scheme can rule this out by signing the message hashed with a salt derived from the secret key and the message, and carried in the signature. This costs only 16 signature bytes and one hash, so we prefer to rely on this heuristic rather than complicating the rules.
 
 3. **Verification cycles:** for every secret key, message and oracle, if the experiment succeeds, [`verify`](#verify)'s cycles plus the witness charge `⌈W / 256⌉` are at most [`C`](#submission).
 
