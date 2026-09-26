@@ -67,9 +67,9 @@ def validate_json(raw: bytes, claim: dict) -> dict:
         if counts['HALT'] != samples:
             raise PresentationError('each accepting run must execute one HALT')
         if any(not isinstance(bits, str) or not INTEGER.fullmatch(bits) or len(bits) > 9 or int(bits) > 2**27 or
-               int(bits) % 64 or type(count) is not int or count < 1 or count > claim['C'] * samples
+               int(bits) % 512 or int(bits) == 0 or type(count) is not int or count < 1 or count > claim['C'] * samples
                for bits, count in hashes.items()):
-            raise PresentationError('HASH counts must be grouped by input bit length, a multiple of 64')
+            raise PresentationError('HASH counts must be grouped by input bit length, a nonzero multiple of 512')
         blocks = sum(count * max(1, (int(bits) + 511) // 512) for bits, count in hashes.items())
         instructions = sum(count * (4 if key in MULTIPLY_DIVIDE else 1) for key, count in counts.items())
         cycles = instructions + 8 * blocks + samples * ((claim['W'] + 255) // 256)

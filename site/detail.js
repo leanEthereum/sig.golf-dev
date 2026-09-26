@@ -75,7 +75,7 @@ async function renderPresentation(entry) {
     Number.isSafeInteger(count) && count >= 0);
   if (!ordinary.some(([name, count]) => name === 'HALT' && count === profile.samples)) return;
   const hashes = Object.entries(profile.hashes).filter(([bits, count]) =>
-    /^(0|[1-9][0-9]*)$/.test(bits) && Number(bits) <= 2 ** 27 && Number(bits) % 64 === 0 &&
+    /^(0|[1-9][0-9]*)$/.test(bits) && Number(bits) <= 2 ** 27 && Number(bits) > 0 && Number(bits) % 512 === 0 &&
     Number.isSafeInteger(count) && count > 0).sort((a, b) => Number(a[0]) - Number(b[0]));
   const rows = ordinary.map(([name, total]) => multiplyDivide.has(name)
     ? {name: `${name} (4 cycles/instruction)`, total, cycles: 4 * total}

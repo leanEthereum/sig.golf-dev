@@ -19,25 +19,25 @@ class PresentationTests(unittest.TestCase):
                  'facts': [{'label': 'Digest', 'value': '256 bits'}],
                  'profile': {'samples': 2, 'method': 'Two fixed accepting messages',
                              'instructions': {'ADDI': 8, 'HALT': 2},
-                             'hashes': {'192': 1, '768': 1}}}
+                             'hashes': {'512': 1, '1024': 1}}}
         self.assertEqual(validate_json(encoded(value), CLAIM), value)
 
     def test_cycle_bound_catches_bad_profile(self):
         value = {'version': 1, 'summary': 'A small forest.',
                  'profile': {'samples': 1, 'method': 'One run',
                              'instructions': {'ADDI': 100, 'HALT': 1},
-                             'hashes': {'192': 1}}}
+                             'hashes': {'512': 1}}}
         with self.assertRaisesRegex(PresentationError, 'exceed'):
             validate_json(encoded(value), CLAIM)
 
     def test_hash_rows_use_input_bit_length_for_cycles(self):
         value = {'version': 1, 'summary': 'A small forest.',
                  'profile': {'samples': 1, 'method': 'One accepting run',
-                             'instructions': {'HALT': 1}, 'hashes': {'192': 1, '768': 1}}}
+                             'instructions': {'HALT': 1}, 'hashes': {'512': 1, '1024': 1}}}
         self.assertEqual(validate_json(encoded(value), {'C': 25, 'W': 0}), value)
         with self.assertRaisesRegex(PresentationError, 'exceed'):
             validate_json(encoded(value), {'C': 24, 'W': 0})
-        for bits in ('0192', '520'):
+        for bits in ('0512', '520', '0'):
             value['profile']['hashes'] = {bits: 1}
             with self.assertRaisesRegex(PresentationError, 'bit length'):
                 validate_json(encoded(value), {'C': 25, 'W': 0})

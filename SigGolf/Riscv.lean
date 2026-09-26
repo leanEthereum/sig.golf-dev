@@ -151,20 +151,19 @@ def fetch (image : Image) (state : MachineState) : Option Instruction := do
     let word ← image.code[(state.pc.toNat - 0x1000) / 4]?
     decodeInstruction word
 
-/-- HASH reads whole 8-byte words: both addresses are 8-byte aligned and the byte length is a multiple of 8. -/
+/-- HASH reads whole 64-byte blocks: both addresses are 8-byte aligned and the byte length is a nonzero multiple of 64. -/
 def hashArgumentsValid (state : MachineState) : Bool :=
   let source := state.getReg .x10
   let bytes := (state.getReg .x11).toNat
   let destination := state.getReg .x12
-  decide (source.toNat % 8 = 0) && decide (bytes % 8 = 0) && rangeValid source bytes &&
+  decide (source.toNat % 8 = 0) && decide (0 < bytes ∧ bytes % 64 = 0) && rangeValid source bytes &&
     accessValid destination 8 && rangeValid destination 32
 
-/-- The oracle input is the bit string of the input bytes, least-significant bit first within each byte. -/
+/-- The oracle input is the `a1` input bytes in increasing address order, `a1 / 64` blocks. -/
 def hashInput (state : MachineState) : Query :=
-  let n := 8 * (state.getReg .x11).toNat
-  ⟨n, BitVec.ofNat n ((List.range n).foldl (fun acc i =>
-    acc + if (state.getByte (state.getReg .x10 + BitVec.ofNat 64 (i / 8))).getLsbD (i % 8)
-      then 2 ^ i else 0) 0)⟩
+  let n := (state.getReg .x11).toNat / 64 - 1
+  ⟨n, BitVec.ofNat (8 * (64 * (n + 1))) ((List.range (64 * (n + 1))).foldl (fun acc i =>
+    acc + (state.getByte (state.getReg .x10 + BitVec.ofNat 64 i)).toNat * 2 ^ (8 * i)) 0)⟩
 
 def writeHash (state : MachineState) (answer : BitVec 256) : MachineState :=
   (state.writeWords (state.getReg .x12)
@@ -199,7 +198,7 @@ def execute : Nat → Image → MachineState → OracleComp HashSpec Execution
         let input := hashInput state
         let answer ← HashSpec.query input
         let result ← execute fuel image (writeHash state answer)
-        return result.charge (8 * compressions input.1) 1 (compressions input.1)
+        return result.charge (8 * input.blocks) 1 input.blocks
       else if state.getReg .x5 = 1 then
         pure ⟨if state.getReg .x10 = 0 then .success else .failure, state, 1, 0, 0⟩
       else pure ⟨.failure, state, 1, 0, 0⟩

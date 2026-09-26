@@ -54,8 +54,6 @@ structure Layout where
 def Sizes.Valid (sizes : Sizes) : Prop :=
   1 ≤ sizes.signature ∧ sizes.witness ≤ MAX_WITNESS_BYTES
 
-def compressions (bits : Nat) : Nat := max 1 ((bits + 511) / 512)
-
 /-- Verification is also charged one cycle per started 256-byte block of witness. -/
 def witnessCycles (bytes : Nat) : Nat := (bytes + 255) / 256
 

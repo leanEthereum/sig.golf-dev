@@ -3,8 +3,13 @@ import SigGolf.Parameters
 namespace SigGolf
 open OracleSpec OracleComp
 
-/-- Exact bit strings, including their lengths; no implicit domain separation. -/
-abbrev Query := (n : Nat) × BitVec n
+/-- Byte strings of one or more 64-byte blocks, as HASH reads them: `⟨n, bytes⟩` holds `n + 1` blocks.
+The length is part of the input; there is no implicit domain separation. -/
+abbrev Query := (n : Nat) × Bytes (64 * (n + 1))
+
+/-- The number of 64-byte blocks in an oracle input, which is also its compression count. -/
+def Query.blocks (query : Query) : Nat := query.1 + 1
+
 abbrev HashSpec : OracleSpec Query := Query →ₒ BitVec 256
 abbrev Hash := QueryImpl HashSpec Id
 abbrev World := unifSpec + HashSpec

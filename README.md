@@ -73,11 +73,11 @@ Checks whether the witness authenticates the message under the public key.
 
 ### Random oracle
 
-All programs share one random oracle H that maps each input to an independent uniform 32-byte answer. The adversary in the [security game](#security) queries the same H, and the Lean security proofs are carried out in this model. Security counts calls to H.
+All programs and the [security game](#security)'s adversary share one random oracle H, mapping each input of 64·k bytes (k ≥ 1) to an independent uniform 32-byte answer. Security is proved in Lean in this model and counts calls to H.
 
 ### RISC-V programs
 
-Each program is an [RV64IM](#risc-v-interface) program with one extra instruction, `HASH(input, n, output)`, issued as a [system call](#system-calls). It reads n bytes starting at address `input`, queries H on them, and writes the 32-byte answer at address `output`. The input and output addresses must both be multiples of 8, and so must n. Hashing n bytes costs `max(1, ⌈n / 64⌉)` compressions.
+Each program is an [RV64IM](#risc-v-interface) program with one extra instruction, `HASH(input, n, output)`, issued as a [system call](#system-calls). It reads n bytes starting at address `input`, queries H on them, and writes the 32-byte answer at address `output`. The input and output addresses must both be multiples of 8, and n must be a nonzero multiple of 64. Hashing n bytes costs `n / 64` compressions.
 
 | Operation                                                                                                       | Cost                                                   |
 | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
@@ -173,8 +173,8 @@ HASH writes H's 32-byte answer at the output address.
 - **Registers:** `x0`–`x31` are 64 bits. `x0` always reads zero and ignores writes. Aliases are `sp = x2`, `t0 = x5`, and `a0`–`a2 = x10`–`x12`. PC is separate.
 - **Memory access:** addresses count bytes; multi-byte integers are little-endian. Loads and stores access only memory, not code. Accesses of 1, 2, 4, or 8 bytes require alignment to their size. Misaligned accesses fail.
 - **Bounds:** every memory access and buffer must fit completely in memory. For unsigned byte address p and length n, require `p + n <= 0x1000000`. All size, layout, and bounds calculations use mathematical integers without overflow. Instruction arithmetic and effective-address calculation follow RV64IM.
-- **HASH arguments:** addresses and byte length n are unsigned 64-bit values. The input and output addresses must both be 8-byte aligned, and n must be a multiple of 8. The input’s n bytes and the output’s 32 bytes must fit entirely in memory. Check all of this before any oracle call or write.
-- **HASH execution:** read the n input bytes in increasing address order; H’s input is their `8n` bits, least-significant bit first within each byte. Read all input before writing the answer, so buffers may overlap. Preserve integer registers and advance PC by 4.
+- **HASH arguments:** addresses and byte length n are unsigned 64-bit values. The input and output addresses must both be 8-byte aligned, and n must be a nonzero multiple of 64. The input’s n bytes and the output’s 32 bytes must fit entirely in memory. Check all of this before any oracle call or write.
+- **HASH execution:** read the n input bytes in increasing address order; they are H’s input. Read all input before writing the answer, so buffers may overlap. Preserve integer registers and advance PC by 4.
 
 ## Lean project
 
