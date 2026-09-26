@@ -153,16 +153,16 @@ Each submission specifies six byte offsets, shared by all four programs: δ<sub>
 
 Before each execution, memory is zero except for embedded data and the inputs listed under [Programs](#programs); unused object buffers remain zero. For example, before [`sign`](#sign), write the secret key, cache, and message at their offsets. On success, read the signature at δ<sub>signature</sub>.
 
-HALT ends execution with `a0 = 1` for success, or `a0 = 0` for failure. For [`verify`](#verify), these mean acceptance and rejection, respectively.
+HALT ends execution with exit code `a0`: `0` means success and any other value failure. For [`verify`](#verify), these mean acceptance and rejection, respectively.
 
 ### System calls
 
 ECALL selects one of two services through `t0`:
 
-| `t0` | Service | Arguments                                                                 |
-| ---: | ------- | ------------------------------------------------------------------------- |
-|    0 | HALT    | Status and outputs above                                                  |
-|    1 | HASH    | `a0 = input address`, `a1 = input length in bytes`, `a2 = output address` |
+| `t0`            | Service | Arguments                                                                 |
+| --------------- | ------- | ------------------------------------------------------------------------- |
+| 0               | HASH    | `a0 = input address`, `a1 = input length in bytes`, `a2 = output address` |
+| any other value | HALT    | `a0 = exit code` (0 = success)                                            |
 
 HASH writes H's 32-byte answer at the output address.
 

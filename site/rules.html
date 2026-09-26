@@ -177,13 +177,13 @@
           <h3>Inputs and outputs</h3>
           <p id="memory-layout">Each submission specifies six byte offsets, shared by all four programs: δ<sub>message</sub>, δ<sub>secret key</sub>, δ<sub>public key</sub>, δ<sub>cache</sub>, δ<sub>signature</sub>, δ<sub>witness</sub>. Each gives the memory address where that object is written or read. The buffers have the sizes in <a href="#parameters">Parameters</a>, start at 8-byte-aligned addresses, do not overlap, and end at or below <a href="#data-base"><code>data_base</code></a> for every program.</p>
           <p>Before each execution, memory is zero except for embedded data and the inputs listed under <a href="#programs">Programs</a>; unused object buffers remain zero. For example, before <a href="#sign"><code>sign</code></a>, write the secret key, cache, and message at their offsets. On success, read the signature at δ<sub>signature</sub>.</p>
-          <p>HALT ends execution with <code>a0 = 1</code> for success, or <code>a0 = 0</code> for failure. For <a href="#verify"><code>verify</code></a>, these mean acceptance and rejection, respectively.</p>
+          <p>HALT ends execution with exit code <code>a0</code>: <code>0</code> means success and any other value failure. For <a href="#verify"><code>verify</code></a>, these mean acceptance and rejection, respectively.</p>
 
           <h3 id="system-calls">System calls</h3>
           <p>ECALL selects one of two services through <code>t0</code>:</p>
           <div class="rule-table-wrap"><table><thead><tr><th><code>t0</code></th><th>Service</th><th>Arguments</th></tr></thead><tbody>
-            <tr><td><code>0</code></td><td>HALT</td><td>Status and outputs above</td></tr>
-            <tr><td><code>1</code></td><td>HASH</td><td><code>a0 = input address</code>, <code>a1 = input length in bytes</code>, <code>a2 = output address</code></td></tr>
+            <tr><td><code>0</code></td><td>HASH</td><td><code>a0 = input address</code>, <code>a1 = input length in bytes</code>, <code>a2 = output address</code></td></tr>
+            <tr><td>any other value</td><td>HALT</td><td><code>a0 = exit code</code> (0 = success)</td></tr>
           </tbody></table></div>
           <p>HASH writes <code>H</code>'s 32-byte answer at the output address.</p>
 
