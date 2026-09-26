@@ -7,10 +7,10 @@ private def blank : MachineState := { regs := fun _ => 0, mem := fun _ => 0, pc 
 private def zeroHash : Hash := fun _ => 0
 private def addi (rd rs : Nat) (immediate : Nat) : BitVec 32 :=
   BitVec.ofNat 32 ((immediate % 4096) * 2 ^ 20 + rs * 2 ^ 15 + rd * 2 ^ 7 + 0x13)
-private def acceptImage : Image := ⟨[addi 10 0 0, 0x73], []⟩
+private def acceptImage : Image := ⟨[addi 5 0 1, 0x73], []⟩
 private def hashImage (bytes : Nat) : Image :=
-  ⟨[addi 5 0 1, addi 10 0 0, addi 11 0 bytes, addi 12 0 0, 0x73,
-    addi 5 0 0, addi 10 0 0, 0x73], []⟩
+  ⟨[addi 10 0 0, addi 11 0 bytes, addi 12 0 0, 0x73,
+    addi 5 0 1, addi 10 0 0, 0x73], []⟩
 private def toy : Submission := ⟨⟨1, 1⟩, standardLayout ⟨1, 1⟩, fun _ => hashImage 72⟩
 private def movedLayout : Layout := ⟨0x40000, 0x40020, 0x40040, 0x50000, 0x80000, 0x81000⟩
 private def movedToy : Submission := { toy with layout := movedLayout }
@@ -60,16 +60,16 @@ private def cacheEcho : Submission where
   sizes := ⟨1, 1⟩
   layout := standardLayout ⟨1, 1⟩
   image
-    | .sign => ⟨(hashImage 72).code.take 5 ++
+    | .sign => ⟨(hashImage 72).code.take 4 ++
         [0x00020437, addi 8 8 0x60, 0x06004383, 0x00740023,
-          addi 5 0 0, addi 10 0 0, 0x73], []⟩
+          addi 5 0 1, addi 10 0 0, 0x73], []⟩
     | _ => acceptImage
 
 private def failedSign : Submission where
   sizes := ⟨1, 1⟩
   layout := standardLayout ⟨1, 1⟩
   image
-    | .sign => ⟨(hashImage 72).code.take 5 ++ [addi 5 0 0, addi 10 0 1, 0x73], []⟩
+    | .sign => ⟨(hashImage 72).code.take 4 ++ [addi 5 0 1, addi 10 0 1, 0x73], []⟩
     | phase => cacheEcho.image phase
 
 private def check (label : String) (condition : Bool) : IO Unit :=
@@ -81,11 +81,11 @@ private def check (label : String) (condition : Bool) : IO Unit :=
   check "HALT is charged" (halted.exit == Exit.success && halted.cycles == 2)
   let one := runSmall (hashImage 64)
   let two := runSmall (hashImage 72)
-  check "HASH has no extra ECALL charge" (one.cycles == 15 && two.cycles == 23)
+  check "HASH has no extra ECALL charge" (one.cycles == 14 && two.cycles == 22)
   let partialWord := runSmall (hashImage 65)
   check "HASH rejects partial words" (partialWord.exit == Exit.failure && partialWord.hashCalls == 0)
   check "multiplication and division cost four cycles"
-    ((runSmall ⟨[0x020000b3, 0x020040b3, 0x020070bb, 0x000000b3, addi 10 0 0, 0x73], []⟩).cycles == 15)
+    ((runSmall ⟨[0x020000b3, 0x020040b3, 0x020070bb, 0x000000b3, addi 5 0 1, 0x73], []⟩).cycles == 15)
   check "hash calls differ from compressions" (two.hashCalls == 1 && two.hashCompressions == 2)
   let emptyHash := runSmall (hashImage 0)
   check "empty HASH still costs one compression" (emptyHash.hashCompressions == 1)
@@ -94,7 +94,7 @@ private def check (label : String) (condition : Bool) : IO Unit :=
   check "malformed ECALL encoding fails" (decodeInstruction 0x000000f3 |>.isNone)
   check "CSR instructions are not exposed" (decodeInstruction 0x00002073 |>.isNone)
   check "EBREAK fails" ((runSmall ⟨[0x00100073], []⟩).exit == Exit.failure)
-  check "nonzero exit code fails" ((runSmall ⟨[addi 10 0 2, 0x73], []⟩).exit == Exit.failure)
+  check "nonzero exit code fails" ((runSmall ⟨[addi 5 0 1, addi 10 0 2, 0x73], []⟩).exit == Exit.failure)
   check "unknown services fail" ((runSmall ⟨[addi 5 0 7, 0x73], []⟩).exit == Exit.failure)
   check "misaligned PC fails" ((runSmall acceptImage { blank with pc := 0x1002 }).exit == Exit.failure)
   check "x0 stays zero" ((blank.setReg .x0 123).getReg .x0 == 0)
@@ -115,7 +115,7 @@ private def check (label : String) (condition : Bool) : IO Unit :=
   check "HASH accepts a final in-bounds word" (hashArgumentsValid (state.setReg .x10 0xfffff8))
   check "HASH rejects input crossing memory end"
     (!hashArgumentsValid ((state.setReg .x10 0xfffff8).setReg .x11 16))
-  let faulty := runSmall ⟨[0x73], []⟩ ((state.setReg .x5 1).setReg .x12 0xfffff8)
+  let faulty := runSmall ⟨[0x73], []⟩ (state.setReg .x12 0xfffff8)
   check "invalid HASH makes no oracle call" (faulty.exit == Exit.failure && faulty.hashCalls == 0)
   check "load at address zero is valid" (memoryArgumentsValid blank (.LD .x1 .x0 0))
   check "load alignment is enforced" (!memoryArgumentsValid blank (.LD .x1 .x0 1))

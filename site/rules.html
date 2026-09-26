@@ -182,8 +182,8 @@
           <h3 id="system-calls">System calls</h3>
           <p>ECALL selects one of two services through <code>t0</code>:</p>
           <div class="rule-table-wrap"><table><thead><tr><th><code>t0</code></th><th>Service</th><th>Arguments</th></tr></thead><tbody>
-            <tr><td><code>0</code></td><td>HALT</td><td><code>a0 = exit code</code> (0 = success)</td></tr>
-            <tr><td><code>1</code></td><td>HASH</td><td><code>a0 = input address</code>, <code>a1 = input length in bytes</code>, <code>a2 = output address</code></td></tr>
+            <tr><td><code>0</code></td><td>HASH</td><td><code>a0 = input address</code>, <code>a1 = input length in bytes</code>, <code>a2 = output address</code></td></tr>
+            <tr><td><code>1</code></td><td>HALT</td><td><code>a0 = exit code</code> (0 = success)</td></tr>
           </tbody></table></div>
           <p>HASH writes <code>H</code>'s 32-byte answer at the output address.</p>
 
