@@ -159,10 +159,10 @@ HALT ends execution with exit code `a0`: `0` means success and any other value f
 
 ECALL selects one of two services through `t0`:
 
-| `t0`            | Service | Arguments                                                                 |
-| --------------- | ------- | ------------------------------------------------------------------------- |
-| 0               | HASH    | `a0 = input address`, `a1 = input length in bytes`, `a2 = output address` |
-| any other value | HALT    | `a0 = exit code` (0 = success)                                            |
+| `t0` | Service | Arguments                                                                 |
+| ---: | ------- | ------------------------------------------------------------------------- |
+|    0 | HALT    | `a0 = exit code` (0 = success)                                            |
+|    1 | HASH    | `a0 = input address`, `a1 = input length in bytes`, `a2 = output address` |
 
 HASH writes H's 32-byte answer at the output address.
 

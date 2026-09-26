@@ -195,16 +195,14 @@ def execute : Nat → Image → MachineState → OracleComp HashSpec Execution
     match fetch image state with
     | none => pure ⟨.failure, state, 0, 0, 0⟩
     | some (.base .ECALL) =>
-      -- `t0 = 0` selects HASH, so hashing needs no selector write; any other `t0` halts with exit code `a0`.
       if state.getReg .x5 = 0 then
-        if hashArgumentsValid state then do
-          let input := hashInput state
-          let answer ← HashSpec.query input
-          let result ← execute fuel image (writeHash state answer)
-          return result.charge (8 * compressions input.1) 1 (compressions input.1)
-        else pure ⟨.failure, state, 1, 0, 0⟩
-      else
         pure ⟨if state.getReg .x10 = 0 then .success else .failure, state, 1, 0, 0⟩
+      else if state.getReg .x5 = 1 && hashArgumentsValid state then do
+        let input := hashInput state
+        let answer ← HashSpec.query input
+        let result ← execute fuel image (writeHash state answer)
+        return result.charge (8 * compressions input.1) 1 (compressions input.1)
+      else pure ⟨.failure, state, 1, 0, 0⟩
     | some instruction =>
       match ordinaryStep state instruction with
       | none => pure ⟨.failure, state, 1, 0, 0⟩
