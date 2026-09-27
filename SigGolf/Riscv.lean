@@ -2,22 +2,34 @@ import SigGolf.Oracle
 import RiscvZkvm.Rv64.Execution
 import RiscvZkvm.Interpreter.Decode
 
-/-! The beta execution environment reuses ots.golf's pinned RV64 register and arithmetic model. Memory permissions, raw instruction images, missing word instructions, and system calls are defined here. -/
+/-! # RISC-V
+
+The machine a submission's programs run on: a raw instruction image and its memory layout, the
+RV64IM decoder, one execution step, the `HASH` and `HALT` system calls, and how cycles and
+compressions are charged. The base RV64IM decoder and instruction semantics come from the pinned
+`riscv-zkvm` model that ots.golf also uses; the W-suffixed word operations, the memory checks,
+`HASH` and `HALT`, and all pricing are defined here. -/
 
 namespace SigGolf.Riscv
 open RiscvZkvm.Rv64 RiscvZkvm.Interpreter OracleComp OracleSpec
 
+/-! ### Images and layout -/
+
+/-- A program: 32-bit instruction encodings and the bytes loaded at `dataBase`. -/
 structure Image where
   code : List (BitVec 32)
   data : List Byte
   deriving Repr
 
+/-- The size bounded by `MAX_IMAGE_BYTES`. -/
 def Image.byteSize (image : Image) : Nat := 4 * image.code.length + image.data.length
 
+/-- Embedded data sits at the top of memory, 16-byte aligned; `sp` starts here. -/
 def dataBase (image : Image) : Nat := 16 * ((MEMORY_BYTES - image.data.length) / 16)
 def signatureBase (sizes : Sizes) : Nat := 0x60 + 8 * ((sizes.cache + 7) / 8)
 def witnessBase (sizes : Sizes) : Nat := signatureBase sizes + 8 * ((sizes.signature + 7) / 8)
 
+/-- A reference layout: message, secret key, public key, then the cache, signature, and witness in sequence. Submissions may declare any valid layout. -/
 def standardLayout (sizes : Sizes) : Layout :=
   ⟨0, 0x20, 0x40, 0x60, signatureBase sizes, witnessBase sizes⟩
 
@@ -38,6 +50,7 @@ def buffersDisjoint : List (Nat × Nat) → Bool
   | first :: rest =>
       rest.all (fun second => decide (disjointBuffers first second)) && buffersDisjoint rest
 
+/-- Every buffer is 8-byte aligned and ends at or below the embedded data, and no two overlap. -/
 def layoutValid (layout : Layout) (sizes : Sizes) (image : Image) : Prop :=
   (layoutBuffers layout sizes).all (fun buffer =>
     decide (buffer.1 % 8 = 0 ∧ buffer.1 + buffer.2 ≤ dataBase image)) = true ∧
@@ -48,23 +61,29 @@ instance (layout : Layout) (sizes : Sizes) (image : Image) :
   unfold layoutValid
   infer_instance
 
+/-- An image within the size bound whose layout fits below its data. -/
 def Image.Valid (image : Image) (sizes : Sizes) (layout : Layout) : Prop :=
   image.byteSize < MAX_IMAGE_BYTES ∧ layoutValid layout sizes image
 
 instance (image : Image) (sizes : Sizes) (layout : Layout) : Decidable (image.Valid sizes layout) :=
   inferInstanceAs (Decidable (image.byteSize < MAX_IMAGE_BYTES ∧ layoutValid layout sizes image))
 
+/-- `bytes` bytes at `address` lie entirely in memory. -/
 def rangeValid (address : BitVec 64) (bytes : Nat) : Bool :=
   decide (address.toNat + bytes ≤ MEMORY_BYTES)
 
+/-- In memory and aligned to the access size. -/
 def accessValid (address : BitVec 64) (bytes : Nat) : Bool :=
   rangeValid address bytes && decide (address.toNat % bytes = 0)
+
+/-! ### Decoding -/
 
 /-- Extensions needed to cover the complete RV64IM word-operation family. -/
 inductive WordOp where
   | add | sub | sll | srl | sra | mul | div | divu | rem | remu
   deriving DecidableEq, Repr
 
+/-- A decoded instruction: one from the upstream model, or a word operation it lacks. -/
 inductive Instruction where
   | base (instruction : Instr)
   | word (op : WordOp) (rd rs1 rs2 : Reg)
@@ -115,7 +134,9 @@ def wordResult (op : WordOp) (a b : BitVec 32) : BitVec 32 :=
   | .rem => if b = 0 then a else a.srem b
   | .remu => if b = 0 then a else a % b
 
-/-- All data accesses use beta's complete byte-range checks, including address zero. -/
+/-! ### One step -/
+
+/-- Every data access is bounds- and alignment-checked; address zero is an ordinary valid address. -/
 def memoryArgumentsValid (state : MachineState) : Instr → Bool
   | .LB _ rs off | .LBU _ rs off | .SB rs _ off =>
       accessValid (state.getReg rs + signExtend12 off) 1
@@ -139,19 +160,22 @@ def ordinaryStep (state : MachineState) : Instruction → Option MachineState
       let value := ((state.getReg rs).truncate 32).sshiftRight shift.toNat
       some ((state.setReg rd (value.signExtend 64)).setPC (state.pc + 4))
 
-/-- Multiplication, division, and remainder instructions cost four cycles; every other instruction costs one. -/
+/-- Multiplication, division, and remainder instructions cost four cycles; every other ordinary instruction costs one. `ECALL` is priced in `execute`. -/
 def instructionCycles : Instruction → Nat
   | .base (.MUL ..) | .base (.MULH ..) | .base (.MULHSU ..) | .base (.MULHU ..)
   | .base (.DIV ..) | .base (.DIVU ..) | .base (.REM ..) | .base (.REMU ..) => 4
   | .word .mul .. | .word .div .. | .word .divu .. | .word .rem .. | .word .remu .. => 4
   | _ => 1
 
+/-- The instruction at `PC`: code starts at `0x1000`, four bytes per instruction. -/
 def fetch (image : Image) (state : MachineState) : Option Instruction := do
   if state.pc.toNat < 0x1000 || state.pc.toNat % 4 != 0 then none else
     let word ← image.code[(state.pc.toNat - 0x1000) / 4]?
     decodeInstruction word
 
-/-- HASH reads whole 64-byte blocks: both addresses are 8-byte aligned and the byte length is a nonzero multiple of 64. -/
+/-! ### HASH -/
+
+/-- HASH reads whole 64-byte blocks: both addresses are 8-byte aligned, the byte length is a nonzero multiple of 64, and input and output lie in memory. -/
 def hashArgumentsValid (state : MachineState) : Bool :=
   let source := state.getReg .x10
   let bytes := (state.getReg .x11).toNat
@@ -165,15 +189,20 @@ def hashInput (state : MachineState) : Query :=
   ⟨n, BitVec.ofNat (8 * (64 * (n + 1))) ((List.range (64 * (n + 1))).foldl (fun acc i =>
     acc + (state.getByte (state.getReg .x10 + BitVec.ofNat 64 i)).toNat * 2 ^ (8 * i)) 0)⟩
 
+/-- Write the 32-byte answer at `a2`, little-endian, and advance `PC`. -/
 def writeHash (state : MachineState) (answer : BitVec 256) : MachineState :=
   (state.writeWords (state.getReg .x12)
     [answer.extractLsb' 0 64, answer.extractLsb' 64 64,
       answer.extractLsb' 128 64, answer.extractLsb' 192 64]).setPC (state.pc + 4)
 
+/-! ### Execution and costs -/
+
+/-- How a run ended: `HALT` with exit code 0, any fault or nonzero exit code, or cut off by the observation fuel. -/
 inductive Exit where
   | success | failure | unfinished
   deriving DecidableEq, Repr
 
+/-- A finished or cut-off run with its final state and charges. -/
 structure Execution where
   exit : Exit
   state : MachineState
@@ -181,6 +210,7 @@ structure Execution where
   hashCalls : Nat := 0
   hashCompressions : Nat := 0
 
+/-- Add one instruction's cycles, hash calls, and compressions. -/
 def Execution.charge (result : Execution) (cycles hashes blocks : Nat) : Execution :=
   { result with
     cycles := cycles + result.cycles

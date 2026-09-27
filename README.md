@@ -92,7 +92,9 @@ Verification also pays for its witness: `⌈W / 256⌉` cycles.
 
 ## Required Lean statements
 
-### Completeness
+`SigGolf.Certificate submission C` has six fields: `admission` (the [sizes, image limits, and layout](#risc-v-interface)), `completeness`, `compressionBudgets`, `verificationCycles`, `security`, and `termination`.
+
+### Honest experiment
 
 For any `secretKey`, `message` and oracle H, consider the following experiment:
 
@@ -105,7 +107,7 @@ Stop at the first failure. We say the `experiment succeeds` when all stages succ
 
 `N_P` counts program P's compressions; it is zero if P is never reached. `BUDGET_P` denotes P's named budget.
 
-1. **Success:** for every secret key, `Pr_H[experiment succeeds for every message] >= 1 - FAILURE`.
+1. **Completeness:** for every secret key, `Pr_H[experiment succeeds for every message] >= 1 - FAILURE`.
 2. **Compression budgets:** for every secret key and P in {`keygen`, `sign`, `expand`}, `E_{H,M}[2^(N_P / BUDGET_P)] <= 2`.
 
 `Pr_H` is over H; `E_{H,M}` is over an independently sampled random oracle H and uniform 32-byte message M.
@@ -122,7 +124,7 @@ Consider the following experiment for a classical probabilistic adversary `A` wi
 2. Run `keygen(secretKey)`. Failure ends the experiment without a win; otherwise give `A` the public key and cache.
 3. `A` may then adaptively query two oracles:
    - **`random_oracle(input_A)`:** return H(input_A).
-   - **`signing_oracle(message_A, cache_A)`:** run `sign(secretKey, cache_A, message_A)` using the original secret key. Return the signature or failure. Add each returned `(message_A, signature)` to T. Allow at most `LIFETIME` requests.
+   - **`signing_oracle(message_A, cache_A)`:** run `sign(secretKey, cache_A, message_A)` using the original secret key. Return the signature or failure. Add each returned `(message_A, signature)` to T. Allow at most `LIFETIME` requests; a further request ends the experiment without a win.
 4. `A` makes one final submission, choosing either form below:
    - **witness weak unforgeability:** submit `(message_A, witness_A)`. `A` wins if `verify(message_A, public key, witness_A)` accepts, and no pair in T has message `message_A`, and the total hash-call count is at most Q
    - **signature strong unforgeability:** submit `(message_A, signature_A)`. `A` wins if `expand(message_A, public key, signature_A)` returns a witness that `verify` accepts, and `(message_A, signature_A)` is not in T, and the total hash-call count is at most Q.
@@ -131,9 +133,9 @@ The total hash-call count includes key generation, signing, `A`’s queries, and
 
 **Security:** for every A and `Q >= 1`, `Pr[A wins] <= Q / 2^SECURITY_BITS`, over the secret key, H, and `A`’s private randomness.
 
-### Program requirements
+### Termination
 
-1. **Termination:** every program terminates with a result or failure in fewer than `CYCLE_LIMIT` cycles, for every input and oracle.
+**Termination:** every program terminates with a result or failure in fewer than `CYCLE_LIMIT` cycles, for every input and oracle.
 
 ## RISC-V interface
 
@@ -182,4 +184,4 @@ HASH writes H's 32-byte answer at the output address.
 
 `SigGolf.Certificate submission C` in [SigGolf/Statements.lean](SigGolf/Statements.lean) is the competition claim for the exact four program images and declared sizes. [SigGolf/Security.lean](SigGolf/Security.lean) defines the attacker and both forgery experiments; [SigGolf/Riscv.lean](SigGolf/Riscv.lean) defines execution and costs.
 
-Build the statements and regression checks with `lake build SigGolf SigGolfTests`. Dependencies are pinned in `lake-manifest.json`. These files define the requirements; they do not certify a particular signature scheme.
+Build the statements and regression checks with `lake build SigGolf SigGolfTests`. Dependencies are pinned in `lake-manifest.json`. These files define the requirements; they do not certify a particular signature scheme. Submissions are verified from the [sig.golf-submissions](https://github.com/leanEthereum/sig.golf-submissions) repository. A complete certificate for a binary hypertree, written against the contract as of commit `ed006e8`, remains in the Git history under `SigGolfCandidate/`.
