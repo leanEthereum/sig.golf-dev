@@ -62,7 +62,7 @@
               <tr><td><math class="rule-math" aria-label="B sub keygen" title="BUDGET_KEYGEN"><msub><mi>B</mi><mtext>keygen</mtext></msub></math></td><td>2<sup>20</sup></td><td>Keygen compression budget</td></tr>
               <tr><td><math class="rule-math" aria-label="B sub sign" title="BUDGET_SIGN"><msub><mi>B</mi><mtext>sign</mtext></msub></math></td><td>2<sup>17</sup></td><td>Signing compression budget</td></tr>
               <tr><td><math class="rule-math" aria-label="B sub expand" title="BUDGET_EXPAND"><msub><mi>B</mi><mtext>expand</mtext></msub></math></td><td>2<sup>20</sup></td><td>Expansion compression budget</td></tr>
-              <tr><td><math class="rule-math" aria-label="epsilon, failure bound" title="FAILURE"><mi>ε</mi></math></td><td>2<sup>−256</sup></td><td>Honest failure probability</td></tr>
+              <tr><td><math class="rule-math" aria-label="epsilon, failure bound" title="FAILURE"><mi>ε</mi></math></td><td>2<sup>−128</sup></td><td>Honest failure probability</td></tr>
               <tr id="parameter-lifetime"><td><math class="rule-math" aria-label="L, signing lifetime" title="LIFETIME"><mi>L</mi></math></td><td>2<sup>32</sup></td><td>Signing lifetime</td></tr>
               <tr><td><math class="rule-math" aria-label="lambda, security bits" title="SECURITY_BITS"><mi>λ</mi></math></td><td>127</td><td>Security level in bits</td></tr>
               <tr id="parameter-cycle-limit"><td><math class="rule-math" aria-label="T, cycle limit" title="CYCLE_LIMIT"><mi>T</mi></math></td><td>2<sup>32</sup></td><td>Program cycle limit</td></tr>
@@ -73,7 +73,7 @@
               <tr><td>Secret key</td><td>32</td></tr>
               <tr><td>Public key</td><td>16</td></tr>
               <tr><td>Cache</td><td>2<sup>17</sup> (128 KiB)</td></tr>
-              <tr><td>Signature</td><td><a href="#score-s"><code>S ≥ 1</code></a></td></tr>
+              <tr><td>Signature</td><td><a href="#score-s"><code>S ≥ 1</code></a> (maximum 16 KiB)</td></tr>
               <tr><td>Witness</td><td><a href="#score-w"><code>W</code></a> (maximum 128 KiB)</td></tr>
             </tbody></table></div>
           </div>

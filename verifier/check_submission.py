@@ -76,7 +76,7 @@ def claim(path: Path) -> dict[str, int | dict[str, int]]:
     if any(type(value[key]) is not int or not INTEGER.fullmatch(str(value[key]))
            for key in ("S", "W", "C")):
         raise ValueError("S, W, and C must be nonnegative decimal integers")
-    if value["S"] < 1 or value["W"] > 2**17 or value["C"] >= 2**32:
+    if value["S"] < 1 or value["S"] > 2**14 or value["W"] > 2**17 or value["C"] >= 2**32:
         raise ValueError("S, W, or C is outside the competition bounds")
     layout = value["layout"]
     if not isinstance(layout, dict) or set(layout) != set(LAYOUT_KEYS):

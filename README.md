@@ -16,7 +16,7 @@ Design a **stateless hash-based signature scheme** minimizing `S × C`: signatur
 | `BUDGET_KEYGEN`   |     2^20 compressions |
 | `BUDGET_SIGN`     |     2^17 compressions |
 | `BUDGET_EXPAND`   |     2^20 compressions |
-| `FAILURE`         |                2^-256 |
+| `FAILURE`         |                2^-128 |
 | `LIFETIME`        | 2^32 signing requests |
 | `SECURITY_BITS`   |                   127 |
 | `CYCLE_LIMIT`     |           2^32 cycles |
@@ -24,14 +24,14 @@ Design a **stateless hash-based signature scheme** minimizing `S × C`: signatur
 
 Every object has a fixed size in bytes:
 
-| Object     |                 Bytes |
-| ---------- | --------------------: |
-| Message    |                    32 |
-| Secret key |                    32 |
-| Public key |                    16 |
-| Cache      |        2^17 (128 KiB) |
-| Signature  |               `S` ≥ 1 |
-| Witness    | `W` (maximum 128 KiB) |
+| Object     |                    Bytes |
+| ---------- | -----------------------: |
+| Message    |                       32 |
+| Secret key |                       32 |
+| Public key |                       16 |
+| Cache      |           2^17 (128 KiB) |
+| Signature  | `S` ≥ 1 (maximum 16 KiB) |
+| Witness    |    `W` (maximum 128 KiB) |
 
 ## Programs
 

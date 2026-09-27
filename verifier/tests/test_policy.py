@@ -45,11 +45,24 @@ class PolicyTests(unittest.TestCase):
         self.assertGreaterEqual(len(value['errors']), 2)
 
     def test_signature_must_fit_memory_layout(self):
-        self.claim['S'] = 1 << 25
+        self.claim['S'] = 16
+        self.claim['layout']['signature'] = (1 << 24) - 8
         self.write_claim()
         value = check(self.root)
         self.assertFalse(value['ok'])
         self.assertIn('signature buffer exceeds 16 MiB memory', value['errors'][0])
+
+    def test_signature_size_is_capped(self):
+        self.claim['S'] = 1 << 14
+        self.claim['layout']['witness'] = 131168 + (1 << 14)
+        self.write_claim()
+        value = check(self.root)
+        self.assertTrue(value['ok'], value['errors'])
+        self.claim['S'] += 1
+        self.write_claim()
+        value = check(self.root)
+        self.assertFalse(value['ok'])
+        self.assertIn('outside the competition bounds', value['errors'][0])
 
     def test_overlapping_buffers_are_rejected(self):
         self.claim['layout']['signature'] = 96

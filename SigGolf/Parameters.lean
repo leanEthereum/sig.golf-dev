@@ -14,8 +14,9 @@ def CYCLE_LIMIT : Nat := 2 ^ 32
 def MEMORY_BYTES : Nat := 2 ^ 24
 def MAX_IMAGE_BYTES : Nat := 2 ^ 20
 def CACHE_BYTES : Nat := 2 ^ 17
+def MAX_SIGNATURE_BYTES : Nat := 2 ^ 14
 def MAX_WITNESS_BYTES : Nat := 2 ^ 17
-noncomputable def FAILURE : ENNReal := 1 / 2 ^ 256
+noncomputable def FAILURE : ENNReal := 1 / 2 ^ 128
 
 abbrev Byte := BitVec 8
 abbrev Bytes (n : Nat) := BitVec (8 * n)
@@ -52,7 +53,7 @@ structure Layout where
   deriving DecidableEq, Repr
 
 def Sizes.Valid (sizes : Sizes) : Prop :=
-  1 ≤ sizes.signature ∧ sizes.witness ≤ MAX_WITNESS_BYTES
+  1 ≤ sizes.signature ∧ sizes.signature ≤ MAX_SIGNATURE_BYTES ∧ sizes.witness ≤ MAX_WITNESS_BYTES
 
 /-- Verification is also charged one cycle per started 256-byte block of witness. -/
 def witnessCycles (bytes : Nat) : Nat := (bytes + 255) / 256

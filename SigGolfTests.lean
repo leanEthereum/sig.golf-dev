@@ -25,6 +25,8 @@ example : rangeValid 0xfffff8 8 = true ∧ rangeValid 0xfffff8 9 = false := by d
 example : rangeValid 0xffffffffffffffff 2 = false := by decide
 example : accessValid 0x100000 8 = true ∧ accessValid 0x1000000 8 = false := by decide
 example : MEMORY_BYTES = 16777216 ∧ MAX_IMAGE_BYTES = 1048576 := by decide
+example : Sizes.Valid ⟨2 ^ 14, 1⟩ ∧ ¬ Sizes.Valid ⟨2 ^ 14 + 1, 1⟩ := by
+  unfold Sizes.Valid MAX_SIGNATURE_BYTES MAX_WITNESS_BYTES; decide
 example (image : Image) (sizes : Sizes) (h : image.byteSize = MAX_IMAGE_BYTES) :
     ¬ image.Valid sizes (standardLayout sizes) := by
   intro valid
