@@ -161,8 +161,8 @@ def _entry(pr: dict, result: dict, contract: str, tree: str) -> dict:
             not isinstance(tree, str) or not SHA.fullmatch(tree) or
             type(number) is not int or number < 1 or
             not isinstance(author, str) or not LOGIN.fullmatch(author) or
-            not isinstance(claim, dict) or set(claim) != {'S', 'W', 'C', 'layout'} or
-            any(type(claim[k]) is not int or claim[k] < 0 for k in ('S', 'W', 'C')) or
+            not isinstance(claim, dict) or set(claim) != {'S', 'W', 'K', 'C', 'layout'} or
+            any(type(claim[k]) is not int or claim[k] < 0 for k in ('S', 'W', 'K', 'C')) or
             not isinstance(claim['layout'], dict) or
             set(claim['layout']) != {'message', 'secret_key', 'public_key', 'cache',
                                      'signature', 'witness'} or
@@ -177,7 +177,7 @@ def _entry(pr: dict, result: dict, contract: str, tree: str) -> dict:
             'author': author, 'avatar_url': f'https://github.com/{author}.png?size=64',
             'assisted_by': assistant, 'title': str(pr.get('title') or '')[:120],
             'verified_at': datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z'),
-            'S': claim['S'], 'W': claim['W'], 'C': claim['C'],
+            'S': claim['S'], 'W': claim['W'], 'K': claim['K'], 'C': claim['C'],
             'score': str(claim['S'] * claim['C']), 'source_tree': tree,
             'source_path': f'verified/{commit}'}
 

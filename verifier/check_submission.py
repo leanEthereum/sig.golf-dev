@@ -13,7 +13,7 @@ MAX_TOTAL_BYTES = 16 * 1024 * 1024
 MODULE = re.compile(r"[A-Za-z_][A-Za-z0-9_']*(?:\.[A-Za-z_][A-Za-z0-9_']*)*")
 INTEGER = re.compile(r"0|[1-9][0-9]*")
 MEMORY_BYTES = 1 << 24
-CLAIM_KEYS = {"S", "W", "C", "layout"}
+CLAIM_KEYS = {"S", "W", "K", "C", "layout"}
 LAYOUT_KEYS = ("message", "secret_key", "public_key", "cache", "signature", "witness")
 ALLOWED_LIBRARIES = ("Mathlib", "ToMathlib", "VCVio", "RiscvZkvm", "Batteries", "Lean", "Init", "Std")
 ALLOWED_CONTRACT = {"SigGolf", "SigGolf.Parameters", "SigGolf.Oracle", "SigGolf.Riscv",
@@ -72,12 +72,13 @@ def claim(path: Path) -> dict[str, int | dict[str, int]]:
         raise ValueError("claim.json exceeds 512 bytes")
     value = json.loads(raw)
     if not isinstance(value, dict) or set(value) != CLAIM_KEYS:
-        raise ValueError("claim.json must contain exactly S, W, C, and layout")
+        raise ValueError("claim.json must contain exactly S, W, K, C, and layout")
     if any(type(value[key]) is not int or not INTEGER.fullmatch(str(value[key]))
-           for key in ("S", "W", "C")):
-        raise ValueError("S, W, and C must be nonnegative decimal integers")
-    if value["S"] < 1 or value["S"] > 2**14 or value["W"] > 2**17 or value["C"] >= 2**32:
-        raise ValueError("S, W, or C is outside the competition bounds")
+           for key in ("S", "W", "K", "C")):
+        raise ValueError("S, W, K, and C must be nonnegative decimal integers")
+    if (value["S"] < 1 or value["S"] > 2**14 or value["W"] > 2**17 or value["K"] > 2**17 or
+            value["C"] >= 2**32):
+        raise ValueError("S, W, K, or C is outside the competition bounds")
     layout = value["layout"]
     if not isinstance(layout, dict) or set(layout) != set(LAYOUT_KEYS):
         raise ValueError("layout must declare exactly the six buffer offsets")
@@ -85,7 +86,7 @@ def claim(path: Path) -> dict[str, int | dict[str, int]]:
            for key in LAYOUT_KEYS):
         raise ValueError("layout offsets must be nonnegative decimal integers")
     lengths = {"message": 32, "secret_key": 32, "public_key": 16,
-               "cache": 1 << 17, "signature": value["S"], "witness": value["W"]}
+               "cache": value["K"], "signature": value["S"], "witness": value["W"]}
     for key in LAYOUT_KEYS:
         start = layout[key]
         if start % 8:

@@ -15,15 +15,15 @@ structure Image where
 def Image.byteSize (image : Image) : Nat := 4 * image.code.length + image.data.length
 
 def dataBase (image : Image) : Nat := 16 * ((MEMORY_BYTES - image.data.length) / 16)
-def signatureBase : Nat := 0x20060
-def witnessBase (sizes : Sizes) : Nat := signatureBase + 8 * ((sizes.signature + 7) / 8)
+def signatureBase (sizes : Sizes) : Nat := 0x60 + 8 * ((sizes.cache + 7) / 8)
+def witnessBase (sizes : Sizes) : Nat := signatureBase sizes + 8 * ((sizes.signature + 7) / 8)
 
 def standardLayout (sizes : Sizes) : Layout :=
-  ⟨0, 0x20, 0x40, 0x60, signatureBase, witnessBase sizes⟩
+  ⟨0, 0x20, 0x40, 0x60, signatureBase sizes, witnessBase sizes⟩
 
 def layoutBuffers (layout : Layout) (sizes : Sizes) : List (Nat × Nat) :=
   [(layout.message, 32), (layout.secretKey, 32), (layout.publicKey, 16),
-   (layout.cache, CACHE_BYTES), (layout.signature, sizes.signature),
+   (layout.cache, sizes.cache), (layout.signature, sizes.signature),
    (layout.witness, sizes.witness)]
 
 def disjointBuffers (left right : Nat × Nat) : Prop :=

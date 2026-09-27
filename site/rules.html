@@ -49,7 +49,7 @@
           <p>A submission contains:</p>
           <ul>
             <li>Four RISC-V programs: <a href="#keygen"><code>keygen</code></a>, <a href="#sign"><code>sign</code></a>, <a href="#expand"><code>expand</code></a>, and <a href="#verify"><code>verify</code></a>.</li>
-            <li id="score-fields">Three integers: <span id="score-s"><code>S</code> (signature size in bytes)</span>, <span id="score-w"><code>W</code> (witness size in bytes)</span>, and <span id="score-c"><code>C</code> (verification cycles)</span>.</li>
+            <li id="score-fields">Four integers: <span id="score-s"><code>S</code> (signature size in bytes)</span>, <span id="score-w"><code>W</code> (witness size in bytes)</span>, <span id="score-k"><code>K</code> (cache size in bytes)</span>, and <span id="score-c"><code>C</code> (verification cycles)</span>.</li>
             <li><a href="#memory-layout">Six byte offsets</a> specifying where RISC-V inputs and outputs reside in memory.</li>
             <li>Lean 4 proofs for every <a href="#proofs">required statement</a>.</li>
           </ul>
@@ -72,8 +72,8 @@
               <tr><td>Message</td><td>32</td></tr>
               <tr><td>Secret key</td><td>32</td></tr>
               <tr><td>Public key</td><td>16</td></tr>
-              <tr><td>Cache</td><td>2<sup>17</sup> (128 KiB)</td></tr>
-              <tr><td>Signature</td><td><a href="#score-s"><code>S ≥ 1</code></a> (maximum 16 KiB)</td></tr>
+              <tr><td>Cache</td><td><a href="#score-k"><code>K</code></a> (maximum 128 KiB)</td></tr>
+              <tr><td>Signature</td><td><a href="#score-s"><code>S</code></a> (minimum 1 byte, maximum 16 KiB)</td></tr>
               <tr><td>Witness</td><td><a href="#score-w"><code>W</code></a> (maximum 128 KiB)</td></tr>
             </tbody></table></div>
           </div>
@@ -96,14 +96,16 @@
               <div><dt>Inputs</dt><dd>Secret key, cache, message</dd></div>
               <div><dt>Outputs</dt><dd>Signature or failure</dd></div>
             </dl>
+            <p>Suggestion: the cache is untrusted, so a tampered cache must not leak secrets or aid a forgery. A MAC prevents this: keygen stores <code>H(domain separator ‖ secret key ‖ rest of the cache)</code> in the cache, and sign checks it.</p>
           </section>
           <section id="expand" class="program-block" aria-labelledby="expand-title">
             <div class="program-heading"><h3 id="expand-title"><code>expand</code></h3><span>Prover host</span></div>
-            <p>Converts the signature into a verification witness.<br>Example: It may restore pruned Merkle paths or copy the signature when <a href="#score-s"><code>S</code></a> = <a href="#score-w"><code>W</code></a>.</p>
+            <p>Converts the signature into a verification witness.</p>
             <dl class="program-io">
               <div><dt>Inputs</dt><dd>Message, public key, signature</dd></div>
               <div><dt>Outputs</dt><dd>Witness or failure</dd></div>
             </dl>
+            <p>Example: It may restore pruned Merkle paths or copy the signature when <a href="#score-s"><code>S</code></a> = <a href="#score-w"><code>W</code></a>.</p>
           </section>
           <section id="verify" class="program-block" aria-labelledby="verify-title">
             <div class="program-heading"><h3 id="verify-title"><code>verify</code></h3><span>zkVM</span></div>
@@ -134,10 +136,10 @@
           <h2>Required Lean statements</h2>
           <h3>Completeness</h3>
           <p><strong>Experiment:</strong> For any <code>secretKey</code>, <code>message</code>, and oracle <a href="#oracle-definition"><code>H</code></a>, run <a href="#keygen"><code>keygen(secretKey)</code></a> to get the public key and cache; <a href="#sign"><code>sign(secretKey, cache, message)</code></a> to get the signature; <a href="#expand"><code>expand(message, public key, signature)</code></a> to get the witness; then <a href="#verify"><code>verify(message, public key, witness)</code></a> to get the verdict. Stop at the first failure. The experiment succeeds when all stages succeed and verification accepts.</p>
-          <p><math class="rule-math" aria-label="K sub P"><msub><mi>K</mi><mi>P</mi></msub></math> counts program <code>P</code>'s compressions; it is zero if <code>P</code> is never reached. <math class="rule-math" aria-label="B sub P"><msub><mi>B</mi><mi>P</mi></msub></math> denotes <code>P</code>'s named budget.</p>
+          <p><math class="rule-math" aria-label="N sub P"><msub><mi>N</mi><mi>P</mi></msub></math> counts program <code>P</code>'s compressions; it is zero if <code>P</code> is never reached. <math class="rule-math" aria-label="B sub P"><msub><mi>B</mi><mi>P</mi></msub></math> denotes <code>P</code>'s named budget.</p>
           <ol class="claim-list">
             <li><b>Success</b><span>For every secret key, <math class="rule-math" aria-label="Probability over H that the experiment succeeds for every message is at least one minus epsilon"><msub><mi>Pr</mi><mi>H</mi></msub><mo>[</mo><mtext>success for every message</mtext><mo>]</mo><mo>≥</mo><mn>1</mn><mo>−</mo><mi>ε</mi></math>.</span></li>
-            <li><b>Compression budgets</b><span>For every secret key and <code>P</code> in {<a href="#keygen"><code>keygen</code></a>, <a href="#sign"><code>sign</code></a>, <a href="#expand"><code>expand</code></a>}: <math class="rule-math" aria-label="Expectation over H and M of two raised to K sub P divided by B sub P is at most two"><msub><mi>𝔼</mi><mrow><mi>H</mi><mo>,</mo><mi>M</mi></mrow></msub><mo>[</mo><msup><mn>2</mn><mrow><msub><mi>K</mi><mi>P</mi></msub><mo>/</mo><msub><mi>B</mi><mi>P</mi></msub></mrow></msup><mo>]</mo><mo>≤</mo><mn>2</mn></math></span></li>
+            <li><b>Compression budgets</b><span>For every secret key and <code>P</code> in {<a href="#keygen"><code>keygen</code></a>, <a href="#sign"><code>sign</code></a>, <a href="#expand"><code>expand</code></a>}: <math class="rule-math" aria-label="Expectation over H and M of two raised to N sub P divided by B sub P is at most two"><msub><mi>𝔼</mi><mrow><mi>H</mi><mo>,</mo><mi>M</mi></mrow></msub><mo>[</mo><msup><mn>2</mn><mrow><msub><mi>N</mi><mi>P</mi></msub><mo>/</mo><msub><mi>B</mi><mi>P</mi></msub></mrow></msup><mo>]</mo><mo>≤</mo><mn>2</mn></math></span></li>
           </ol>
           <p class="fine-print"><math class="rule-math" aria-label="Probability over H"><msub><mi>Pr</mi><mi>H</mi></msub></math> is over <code>H</code>; <math class="rule-math" aria-label="Expectation over H and M"><msub><mi>𝔼</mi><mrow><mi>H</mi><mo>,</mo><mi>M</mi></mrow></msub></math> is over an independently sampled random oracle <code>H</code> and uniform 32-byte message <code>M</code>.</p>
           <p class="fine-print"><strong>Remark.</strong> After <code>H</code> is fixed, adaptively chosen messages may cost much more than this average. Any scheme can rule this out by signing the message hashed with a salt derived from the secret key and the message, and carried in the signature. This costs only 16 signature bytes and one hash, so we prefer to rely on this heuristic rather than complicating the rules.</p>

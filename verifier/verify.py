@@ -205,7 +205,7 @@ def verify(args: argparse.Namespace) -> dict:
         shutil.copytree(source / 'SigGolfCandidate', project / 'SigGolfCandidate')
         shutil.copy2(source / 'Solution.lean', project / 'Solution.lean')
         challenge = (args.trusted / 'verifier' / 'Challenge.lean.in').read_text()
-        placeholders = {key: policy['claim'][key] for key in ('S', 'W', 'C')}
+        placeholders = {key: policy['claim'][key] for key in ('S', 'W', 'K', 'C')}
         placeholders.update({key.upper(): value for key, value in policy['claim']['layout'].items()})
         for key, value in placeholders.items():
             challenge = challenge.replace('{{' + key + '}}', str(value))

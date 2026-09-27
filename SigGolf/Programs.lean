@@ -14,12 +14,12 @@ def Submission.score (submission : Submission) (cycles : Nat) : Nat :=
 
 def Input (sizes : Sizes) : Phase → Type
   | .keygen => SecretKey
-  | .sign => SecretKey × Cache × Message
+  | .sign => SecretKey × Bytes sizes.cache × Message
   | .expand => Message × PublicKey × Bytes sizes.signature
   | .verify => Message × PublicKey × Bytes sizes.witness
 
 def Output (sizes : Sizes) : Phase → Type
-  | .keygen => PublicKey × Cache
+  | .keygen => PublicKey × Bytes sizes.cache
   | .sign => Bytes sizes.signature
   | .expand => Bytes sizes.witness
   | .verify => Unit
@@ -60,7 +60,7 @@ def initialState (submission : Submission) (phase : Phase) (input : Input submis
 def readOutput (sizes : Sizes) (layout : Layout) :
     (phase : Phase) → MachineState → Output sizes phase
   | .keygen, state =>
-      (readBuffer state layout.publicKey 16, readBuffer state layout.cache CACHE_BYTES)
+      (readBuffer state layout.publicKey 16, readBuffer state layout.cache sizes.cache)
   | .sign, state => readBuffer state layout.signature sizes.signature
   | .expand, state => readBuffer state layout.witness sizes.witness
   | .verify, _ => ()

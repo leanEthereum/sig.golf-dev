@@ -8,6 +8,8 @@ theorem signature_bytes : submission.sizes.signature = {{S}} := sorry
 
 theorem witness_bytes : submission.sizes.witness = {{W}} := sorry
 
+theorem cache_bytes : submission.sizes.cache = {{K}} := sorry
+
 theorem layout_offsets : submission.layout =
   { message := {{MESSAGE}}, secretKey := {{SECRET_KEY}}, publicKey := {{PUBLIC_KEY}},
     cache := {{CACHE}}, signature := {{SIGNATURE}}, witness := {{WITNESS}} } := sorry

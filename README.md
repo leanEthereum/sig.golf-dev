@@ -5,7 +5,7 @@ Design a **stateless hash-based signature scheme** minimizing `S × C`: signatur
 ## Submission
 
 1. Four RISC-V program images: [keygen](#keygen), [sign](#sign), [expand](#expand), and [verify](#verify), including embedded data.
-2. Nonnegative integers `S`, `W`, and `C`: signature bytes, witness bytes, and verification cycles.
+2. Nonnegative integers `S`, `W`, `K`, and `C`: signature, witness, and cache bytes, and verification cycles.
 3. [Six byte offsets](#inputs-and-outputs) specifying where RISC-V inputs and outputs reside in memory.
 4. Lean 4 proofs of the [required statements](#required-lean-statements) for those exact images, sizes, layout, and bound.
 
@@ -24,14 +24,14 @@ Design a **stateless hash-based signature scheme** minimizing `S × C`: signatur
 
 Every object has a fixed size in bytes:
 
-| Object     |                    Bytes |
-| ---------- | -----------------------: |
-| Message    |                       32 |
-| Secret key |                       32 |
-| Public key |                       16 |
-| Cache      |           2^17 (128 KiB) |
-| Signature  | `S` ≥ 1 (maximum 16 KiB) |
-| Witness    |    `W` (maximum 128 KiB) |
+| Object     |                           Bytes |
+| ---------- | ------------------------------: |
+| Message    |                              32 |
+| Secret key |                              32 |
+| Public key |                              16 |
+| Cache      |           `K` (maximum 128 KiB) |
+| Signature  | `S` (minimum 1 byte, maximum 16 KiB) |
+| Witness    |           `W` (maximum 128 KiB) |
 
 ## Programs
 
@@ -51,15 +51,17 @@ Produces a compact signature for a given message.
 - **Outputs:** signature or failure.
 - **Context:** enclave.
 
+Suggestion: the cache is untrusted, so a tampered cache must not leak secrets or aid a forgery. A MAC prevents this: keygen stores H(domain separator ‖ secret key ‖ rest of the cache) in the cache, and sign checks it.
+
 ### expand
 
 Converts the signature into a verification witness.
 
-Example: It may restore pruned Merkle paths or copy the signature when `S = W`.
-
 - **Inputs:** message, public key, signature.
 - **Outputs:** witness or failure.
 - **Context:** prover host.
+
+Example: It may restore pruned Merkle paths or copy the signature when `S = W`.
 
 ### verify
 
@@ -101,10 +103,10 @@ For any `secretKey`, `message` and oracle H, consider the following experiment:
 
 Stop at the first failure. We say the `experiment succeeds` when all stages succeed and verification accepts.
 
-`K_P` counts program P's compressions; it is zero if P is never reached. `BUDGET_P` denotes P's named budget.
+`N_P` counts program P's compressions; it is zero if P is never reached. `BUDGET_P` denotes P's named budget.
 
 1. **Success:** for every secret key, `Pr_H[experiment succeeds for every message] >= 1 - FAILURE`.
-2. **Compression budgets:** for every secret key and P in {`keygen`, `sign`, `expand`}, `E_{H,M}[2^(K_P / BUDGET_P)] <= 2`.
+2. **Compression budgets:** for every secret key and P in {`keygen`, `sign`, `expand`}, `E_{H,M}[2^(N_P / BUDGET_P)] <= 2`.
 
 `Pr_H` is over H; `E_{H,M}` is over an independently sampled random oracle H and uniform 32-byte message M.
 

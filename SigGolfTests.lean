@@ -11,7 +11,7 @@ private def acceptImage : Image := ⟨[addi 5 0 1, 0x73], []⟩
 private def hashImage (bytes : Nat) : Image :=
   ⟨[addi 10 0 0, addi 11 0 bytes, addi 12 0 0, 0x73,
     addi 5 0 1, addi 10 0 0, 0x73], []⟩
-private def toy : Submission := ⟨⟨1, 1⟩, standardLayout ⟨1, 1⟩, fun _ => hashImage 128⟩
+private def toy : Submission := ⟨⟨1, 1, 2 ^ 17⟩, standardLayout ⟨1, 1, 2 ^ 17⟩, fun _ => hashImage 128⟩
 private def movedLayout : Layout := ⟨0x40000, 0x40020, 0x40040, 0x50000, 0x80000, 0x81000⟩
 private def movedToy : Submission := { toy with layout := movedLayout }
 private def runSmall (image : Image) (state : MachineState := blank) : Execution :=
@@ -25,8 +25,10 @@ example : rangeValid 0xfffff8 8 = true ∧ rangeValid 0xfffff8 9 = false := by d
 example : rangeValid 0xffffffffffffffff 2 = false := by decide
 example : accessValid 0x100000 8 = true ∧ accessValid 0x1000000 8 = false := by decide
 example : MEMORY_BYTES = 16777216 ∧ MAX_IMAGE_BYTES = 1048576 := by decide
-example : Sizes.Valid ⟨2 ^ 14, 1⟩ ∧ ¬ Sizes.Valid ⟨2 ^ 14 + 1, 1⟩ := by
-  unfold Sizes.Valid MAX_SIGNATURE_BYTES MAX_WITNESS_BYTES; decide
+example : Sizes.Valid ⟨2 ^ 14, 1, 0⟩ ∧ ¬ Sizes.Valid ⟨2 ^ 14 + 1, 1, 0⟩ ∧
+    Sizes.Valid ⟨1, 1, 2 ^ 17⟩ ∧ ¬ Sizes.Valid ⟨1, 1, 2 ^ 17 + 1⟩ := by
+  unfold Sizes.Valid MAX_SIGNATURE_BYTES MAX_WITNESS_BYTES MAX_CACHE_BYTES; decide
+example : signatureBase ⟨1, 1, 0⟩ = 0x60 ∧ signatureBase ⟨1, 1, 9⟩ = 0x70 := by decide
 example (image : Image) (sizes : Sizes) (h : image.byteSize = MAX_IMAGE_BYTES) :
     ¬ image.Valid sizes (standardLayout sizes) := by
   intro valid
@@ -35,12 +37,12 @@ example (image : Image) (sizes : Sizes) (h : image.byteSize = MAX_IMAGE_BYTES) :
 example : wordResult .div 0x80000000 0xffffffff = 0x80000000 := by decide
 example : wordResult .div 7 0 = 0xffffffff ∧ wordResult .rem 7 0 = 7 := by decide
 example : wordResult .sll 1 32 = 1 ∧ wordResult .sra 0x80000000 31 = 0xffffffff := by decide
-example : witnessBase ⟨1, 1⟩ = 0x20068 ∧ witnessBase ⟨9, 1⟩ = 0x20070 := by decide
-example : (hashImage 128).Valid ⟨1, 1⟩ movedLayout := by decide
-example : ¬ (hashImage 128).Valid ⟨1, 1⟩
+example : witnessBase ⟨1, 1, 2 ^ 17⟩ = 0x20068 ∧ witnessBase ⟨9, 1, 2 ^ 17⟩ = 0x20070 := by decide
+example : (hashImage 128).Valid ⟨1, 1, 2 ^ 17⟩ movedLayout := by decide
+example : ¬ (hashImage 128).Valid ⟨1, 1, 2 ^ 17⟩
     { movedLayout with publicKey := movedLayout.message } := by decide
-example : ¬ ({ hashImage 128 with data := List.replicate 32 0 } : Image).Valid ⟨1, 1⟩
-    { standardLayout ⟨1, 1⟩ with witness := MEMORY_BYTES - 16 } := by decide
+example : ¬ ({ hashImage 128 with data := List.replicate 32 0 } : Image).Valid ⟨1, 1, 2 ^ 17⟩
+    { standardLayout ⟨1, 1, 2 ^ 17⟩ with witness := MEMORY_BYTES - 16 } := by decide
 
 private def fixedWorld : QueryImpl World Id
   | .inl n => ⟨0, Nat.zero_lt_succ n⟩
@@ -59,8 +61,8 @@ private def signer : Adversary toy.sizes where
     else .sign ⟨7, 0⟩ (fun _ => true)
 
 private def cacheEcho : Submission where
-  sizes := ⟨1, 1⟩
-  layout := standardLayout ⟨1, 1⟩
+  sizes := ⟨1, 1, 2 ^ 17⟩
+  layout := standardLayout ⟨1, 1, 2 ^ 17⟩
   image
     | .sign => ⟨(hashImage 128).code.take 4 ++
         [0x00020437, addi 8 8 0x60, 0x06004383, 0x00740023,
@@ -68,8 +70,8 @@ private def cacheEcho : Submission where
     | _ => acceptImage
 
 private def failedSign : Submission where
-  sizes := ⟨1, 1⟩
-  layout := standardLayout ⟨1, 1⟩
+  sizes := ⟨1, 1, 2 ^ 17⟩
+  layout := standardLayout ⟨1, 1, 2 ^ 17⟩
   image
     | .sign => ⟨(hashImage 128).code.take 4 ++ [addi 5 0 1, addi 10 0 1, 0x73], []⟩
     | phase => cacheEcho.image phase

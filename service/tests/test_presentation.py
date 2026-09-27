@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from presentation import PresentationError, validate_json, validate_svg
 
-CLAIM = {'S': 10, 'W': 10, 'C': 100}
+CLAIM = {'S': 10, 'W': 10, 'K': 0, 'C': 100}
 
 
 def encoded(value):

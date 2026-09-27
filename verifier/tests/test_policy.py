@@ -15,7 +15,7 @@ class PolicyTests(unittest.TestCase):
         (self.root / 'SigGolfCandidate').mkdir()
         (self.root / 'Solution.lean').write_text('import SigGolfCandidate.Helper\n')
         (self.root / 'SigGolfCandidate' / 'Helper.lean').write_text('import SigGolf\n')
-        self.claim = {'S': 8, 'W': 8, 'C': 100,
+        self.claim = {'S': 8, 'W': 8, 'K': 1 << 17, 'C': 100,
                       'layout': {'message': 0, 'secret_key': 32, 'public_key': 64,
                                  'cache': 96, 'signature': 131168, 'witness': 131176}}
         self.write_claim()
@@ -59,6 +59,17 @@ class PolicyTests(unittest.TestCase):
         value = check(self.root)
         self.assertTrue(value['ok'], value['errors'])
         self.claim['S'] += 1
+        self.write_claim()
+        value = check(self.root)
+        self.assertFalse(value['ok'])
+        self.assertIn('outside the competition bounds', value['errors'][0])
+
+    def test_cache_size_is_declared_and_capped(self):
+        self.claim['K'] = 8
+        self.write_claim()
+        value = check(self.root)
+        self.assertTrue(value['ok'], value['errors'])
+        self.claim['K'] = (1 << 17) + 8
         self.write_claim()
         value = check(self.root)
         self.assertFalse(value['ok'])

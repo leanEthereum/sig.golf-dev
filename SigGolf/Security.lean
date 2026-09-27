@@ -3,13 +3,13 @@ import SigGolf.Programs
 namespace SigGolf
 open OracleComp OracleSpec
 
-structure SigningRequest where
+structure SigningRequest (sizes : Sizes) where
   message : Message
-  cache : Cache
+  cache : Bytes sizes.cache
 
 /-- The attacker supplies only the message and cache. All signing work, including any internal search, is charged. -/
 def Submission.signingOracle (submission : Submission) (secretKey : SecretKey)
-    (request : SigningRequest) : OracleComp HashSpec (RunResult (Bytes submission.sizes.signature)) :=
+    (request : SigningRequest submission.sizes) : OracleComp HashSpec (RunResult (Bytes submission.sizes.signature)) :=
   submission.run .sign (secretKey, request.cache, request.message)
 
 inductive Forgery (sizes : Sizes) where
@@ -20,13 +20,13 @@ inductive Forgery (sizes : Sizes) where
 inductive Action (sizes : Sizes) (state : Type) where
   | submit (candidate : Forgery sizes)
   | hash (input : Query) (resume : BitVec 256 → state)
-  | sign (request : SigningRequest) (resume : Option (Bytes sizes.signature) → state)
+  | sign (request : SigningRequest sizes) (resume : Option (Bytes sizes.signature) → state)
   | sample (n : Nat) (resume : Fin (n + 1) → state)
   | step (next : state)
 
 structure Adversary (sizes : Sizes) where
   State : Type
-  initial : PublicKey → Cache → State
+  initial : PublicKey → Bytes sizes.cache → State
   step : State → Action sizes State
 
 structure Transcript (sizes : Sizes) where
