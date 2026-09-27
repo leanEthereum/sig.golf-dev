@@ -12,4 +12,5 @@ require «riscv-zkvm» from git
 
 @[default_target] lean_lib SigGolf
 lean_lib SigGolfTests
+-- Namespace for submitted proofs; the verifier copies a PR's SigGolfCandidate/ modules here.
 lean_lib SigGolfCandidate
