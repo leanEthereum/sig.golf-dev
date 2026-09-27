@@ -189,7 +189,7 @@
 
         <section id="interface" class="rule-section">
           <h2>RISC-V interface</h2>
-          <p>Use <a href="https://docs.riscv.org/reference/isa/v20260120/unpriv/rv64.html">RV64I</a> and the <a href="https://docs.riscv.org/reference/isa/v20260120/unpriv/m-st-ext.html">M extension</a>. Each program’s image must be smaller than <math class="rule-math" aria-label="I max"><msub><mi>I</mi><mtext>max</mtext></msub></math>: four bytes per instruction plus embedded-data bytes, checked directly at submission.</p>
+          <p>Use <a href="https://docs.riscv.org/reference/isa/v20260120/unpriv/rv64.html">RV64I</a> and the <a href="https://docs.riscv.org/reference/isa/v20260120/unpriv/m-st-ext.html">M extension</a>. Each program’s image must be smaller than <math class="rule-math" aria-label="I max"><msub><mi>I</mi><mtext>max</mtext></msub></math>: four bytes per instruction plus embedded-data bytes.</p>
 
           <h3 id="code-and-memory">Code and memory</h3>
           <p>Code occupies a separate, immutable instruction address space. Instruction <code>i</code> is at <code>0x1000 + 4 × i</code>. Memory occupies <code>0x000000–0xFFFFFF</code> (16 MiB), including embedded data, inputs, outputs, scratch space, and stack. The verifier enforces this range directly; it is not a separate Lean proof obligation.</p>

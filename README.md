@@ -139,7 +139,7 @@ The total hash-call count includes key generation, signing, `A`’s queries, and
 
 Use [RV64I](https://docs.riscv.org/reference/isa/v20260120/unpriv/rv64.html) and the [M extension](https://docs.riscv.org/reference/isa/v20260120/unpriv/m-st-ext.html).
 
-Each program satisfies **`4 × instruction count + embedded-data bytes < MAX_IMAGE_BYTES`**, checked directly at submission.
+Each program satisfies **`4 × instruction count + embedded-data bytes < MAX_IMAGE_BYTES`**.
 
 ### Code and memory
 
