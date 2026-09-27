@@ -145,15 +145,17 @@ Each program satisfies **`4 × instruction count + embedded-data bytes < MAX_IMA
 
 Code occupies a separate, immutable instruction address space. Instruction i is at `0x1000 + 4 × i`.
 
-Memory occupies `0x000000`–`0xFFFFFF` (16 MiB), including embedded data, inputs, outputs, scratch space, and stack. The verifier enforces this range directly; it is not a separate Lean proof obligation.
+Memory occupies `0x000000`–`0xFFFFFF` (16 MiB).
 
-Load D embedded bytes at `data_base = 16 × floor((0x1000000 - D) / 16)`. Initially, `sp = data_base` and `PC = 0x1000`; all other integer registers are zero.
+Load D embedded bytes at `data_base = 16 × floor((0x1000000 - D) / 16)`. Initially, `sp = data_base` and `PC = 0x1000`; all other registers are zero.
 
 ### Inputs and outputs
 
 Each submission specifies six byte offsets, shared by all four programs: δ<sub>message</sub>, δ<sub>secret key</sub>, δ<sub>public key</sub>, δ<sub>cache</sub>, δ<sub>signature</sub>, and δ<sub>witness</sub>. Each gives the memory address where that object is written or read. The buffers have the sizes in [Parameters](#parameters), start at 8-byte-aligned addresses, do not overlap, and end at or below `data_base` for every program.
 
-Before each execution, memory is zero except for embedded data and the inputs listed under [Programs](#programs); unused object buffers remain zero. For example, before [`sign`](#sign), write the secret key, cache, and message at their offsets. On success, read the signature at δ<sub>signature</sub>.
+Before each execution, memory is zero except for embedded data and the inputs listed under [Programs](#programs); unused object buffers remain zero.
+
+Example: before [`sign`](#sign), write the secret key, cache, and message at their offsets. On success, read the signature at δ<sub>signature</sub>.
 
 HALT ends execution with exit code `a0`: `0` means success and any other value failure. For [`verify`](#verify), these mean acceptance and rejection, respectively.
 
@@ -173,13 +175,13 @@ HASH writes H's 32-byte answer at the output address.
 - **Proof checking:** the certificate must pass Lean’s kernel against the organizer’s definitions. Its transitive axiom dependencies may contain only `propext`, `Classical.choice`, and `Quot.sound`.
 - **Instructions:** encodings are 32 bits. Fetching outside the code or at a non-4-byte-aligned address fails. `FENCE` has no effect; `EBREAK` fails.
 - **Registers:** `x0`–`x31` are 64 bits. `x0` always reads zero and ignores writes. Aliases are `sp = x2`, `t0 = x5`, and `a0`–`a2 = x10`–`x12`. PC is separate.
-- **Memory access:** addresses count bytes; multi-byte integers are little-endian. Loads and stores access only memory, not code. Accesses of 1, 2, 4, or 8 bytes require alignment to their size. Misaligned accesses fail.
-- **Bounds:** every memory access and buffer must fit completely in memory. For unsigned byte address p and length n, require `p + n <= 0x1000000`. All size, layout, and bounds calculations use mathematical integers without overflow. Instruction arithmetic and effective-address calculation follow RV64IM.
-- **HASH arguments:** addresses and byte length n are unsigned 64-bit values. The input and output addresses must both be 8-byte aligned, and n must be a nonzero multiple of 64. The input’s n bytes and the output’s 32 bytes must fit entirely in memory. Check all of this before any oracle call or write.
-- **HASH execution:** read the n input bytes in increasing address order; they are H’s input. Read all input before writing the answer, so buffers may overlap. Preserve integer registers and advance PC by 4.
+- **Memory access:** addresses count bytes; multi-byte integers are little-endian. Accesses of 1, 2, 4, or 8 bytes require alignment to their size. Misaligned accesses fail.
+- **Bounds:** every memory access and buffer must fit completely in memory. For unsigned byte address p and length n, require `p + n <= 0x1000000`. Instruction arithmetic and effective-address calculation follow RV64IM.
+- **HASH arguments:** addresses and byte length n are unsigned 64-bit values. The input and output addresses must both be 8-byte aligned, and n must be a nonzero multiple of 64. The input’s n bytes and the output’s 32 bytes must fit entirely in memory.
+- **HASH execution:** read the n input bytes in increasing address order; they are H’s input. Read all input before writing the answer, so buffers may overlap. Preserve registers and advance PC by 4.
 
 ## Lean project
 
 `SigGolf.Certificate submission C` in [SigGolf/Statements.lean](SigGolf/Statements.lean) is the competition claim for the exact four program images and declared sizes. [SigGolf/Security.lean](SigGolf/Security.lean) defines the attacker and both forgery experiments; [SigGolf/Riscv.lean](SigGolf/Riscv.lean) defines execution and costs.
 
-Build the statements and regression checks with `lake build SigGolf SigGolfTests`. Dependencies are pinned in `lake-manifest.json`. These files define the requirements; they do not certify a particular signature scheme. Submissions are verified from the [sig.golf-submissions](https://github.com/leanEthereum/sig.golf-submissions) repository. A complete certificate for a binary hypertree, written against the contract as of commit `ed006e8`, remains in the Git history under `SigGolfCandidate/`.
+Build the statements and regression checks with `lake build SigGolf SigGolfTests`. Dependencies are pinned in `lake-manifest.json`. These files define the requirements; they do not certify a particular signature scheme. Submissions are verified from the [sig.golf-submissions](https://github.com/leanEthereum/sig.golf-submissions) repository.
