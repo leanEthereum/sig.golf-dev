@@ -92,8 +92,6 @@ Verification also pays for its witness: `⌈W / 256⌉` cycles.
 
 ## Required Lean statements
 
-`SigGolf.Certificate submission C` has six fields: `admission` (the [sizes, image limits, and layout](#risc-v-interface)), `completeness`, `compressionBudgets`, `verificationCycles`, `security`, and `termination`.
-
 ### Honest experiment
 
 For any `secretKey`, `message` and oracle H, consider the following experiment:
@@ -124,7 +122,7 @@ Consider the following experiment for a classical probabilistic adversary `A` wi
 2. Run `keygen(secretKey)`. Failure ends the experiment without a win; otherwise give `A` the public key and cache.
 3. `A` may then adaptively query two oracles:
    - **`random_oracle(input_A)`:** return H(input_A).
-   - **`signing_oracle(message_A, cache_A)`:** run `sign(secretKey, cache_A, message_A)` using the original secret key. Return the signature or failure. Add each returned `(message_A, signature)` to T. Allow at most `LIFETIME` requests; a further request ends the experiment without a win.
+   - **`signing_oracle(message_A, cache_A)`:** run `sign(secretKey, cache_A, message_A)` using the original secret key. Return the signature or failure. Add each returned `(message_A, signature)` to T. Allow at most `LIFETIME` requests.
 4. `A` makes one final submission, choosing either form below:
    - **witness weak unforgeability:** submit `(message_A, witness_A)`. `A` wins if `verify(message_A, public key, witness_A)` accepts, and no pair in T has message `message_A`, and the total hash-call count is at most Q
    - **signature strong unforgeability:** submit `(message_A, signature_A)`. `A` wins if `expand(message_A, public key, signature_A)` returns a witness that `verify` accepts, and `(message_A, signature_A)` is not in T, and the total hash-call count is at most Q.
