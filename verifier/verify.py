@@ -202,7 +202,8 @@ def verify(args: argparse.Namespace) -> dict:
         shutil.copytree(args.trusted / 'SigGolf', project / 'SigGolf')
         with (project / 'lakefile.lean').open('a') as out:
             out.write('\nlean_lib Solution\n')
-        shutil.copytree(source / 'SigGolfCandidate', project / 'SigGolfCandidate')
+        if (source / 'SigGolfCandidate').is_dir():  # optional: Solution.lean may stand alone
+            shutil.copytree(source / 'SigGolfCandidate', project / 'SigGolfCandidate')
         shutil.copy2(source / 'Solution.lean', project / 'Solution.lean')
         challenge = (args.trusted / 'verifier' / 'Challenge.lean.in').read_text()
         placeholders = {key: policy['claim'][key] for key in ('S', 'W', 'K', 'C')}
@@ -211,17 +212,16 @@ def verify(args: argparse.Namespace) -> dict:
             challenge = challenge.replace('{{' + key + '}}', str(value))
         (project / 'SigGolf' / 'Challenge.lean').write_text(challenge)
         clone_tree(args.trusted / '.lake', project / '.lake')
-        for name in ('SigGolfCandidate', 'Solution'):
-            for folder in (project / '.lake' / 'build' / 'lib' / 'lean', project / '.lake' / 'build' / 'ir'):
-                target = folder / name
-                if target.is_dir():
-                    shutil.rmtree(target)
-                elif target.exists():
-                    target.unlink()
+        # Drop every cached artifact of candidate, solution, and challenge modules: the module
+        # directories and the root-module files (.olean, .ilean, .trace, .hash, .c) beside them.
         for folder in (project / '.lake' / 'build' / 'lib' / 'lean', project / '.lake' / 'build' / 'ir'):
-            target = folder / 'SigGolf' / 'Challenge.olean'
-            if target.exists():
-                target.unlink()
+            for name in ('SigGolfCandidate', 'Solution'):
+                if (folder / name).is_dir():
+                    shutil.rmtree(folder / name)
+                for stale in folder.glob(f'{name}.*'):
+                    stale.unlink()
+            for stale in (folder / 'SigGolf').glob('Challenge.*'):
+                stale.unlink()
         command = ['lake', 'env', env['COMPARATOR_BIN'], str(args.trusted / 'verifier' / 'comparator.json')]
         clean_env = {'PATH': f'{Path.home() / ".elan/bin"}:{os.environ.get("PATH", "/usr/bin:/bin")}',
                      'HOME': str(Path.home()), 'LANG': 'C.UTF-8',
