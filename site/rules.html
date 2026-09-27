@@ -66,7 +66,7 @@
               <tr id="parameter-lifetime"><td><math class="rule-math" aria-label="L, signing lifetime" title="LIFETIME"><mi>L</mi></math></td><td>2<sup>32</sup></td><td>Signing lifetime</td></tr>
               <tr><td><math class="rule-math" aria-label="lambda, security bits" title="SECURITY_BITS"><mi>λ</mi></math></td><td>127</td><td>Security level in bits</td></tr>
               <tr id="parameter-cycle-limit"><td><math class="rule-math" aria-label="T, cycle limit" title="CYCLE_LIMIT"><mi>T</mi></math></td><td>2<sup>32</sup></td><td>Program cycle limit</td></tr>
-              <tr><td><math class="rule-math" aria-label="I max, program size limit" title="MAX_IMAGE_BYTES"><msub><mi>I</mi><mtext>max</mtext></msub></math></td><td>2<sup>20</sup></td><td>Program size limit (bytes)</td></tr>
+              <tr><td><math class="rule-math" aria-label="P max, program size limit" title="MAX_PROGRAM_BYTES"><msub><mi>P</mi><mtext>max</mtext></msub></math></td><td>2<sup>20</sup></td><td>Program size limit (bytes)</td></tr>
             </tbody></table></div>
             <div class="rule-table-wrap"><table><thead><tr><th>Object</th><th>Size (in Bytes)</th></tr></thead><tbody>
               <tr><td>Message</td><td>32</td></tr>
@@ -189,7 +189,7 @@
 
         <section id="interface" class="rule-section">
           <h2>RISC-V interface</h2>
-          <p>Use <a href="https://docs.riscv.org/reference/isa/v20260120/unpriv/rv64.html">RV64I</a> and the <a href="https://docs.riscv.org/reference/isa/v20260120/unpriv/m-st-ext.html">M extension</a>. Each program’s image must be smaller than <math class="rule-math" aria-label="I max"><msub><mi>I</mi><mtext>max</mtext></msub></math>: four bytes per instruction plus embedded-data bytes.</p>
+          <p>Use <a href="https://docs.riscv.org/reference/isa/v20260120/unpriv/rv64.html">RV64I</a> and the <a href="https://docs.riscv.org/reference/isa/v20260120/unpriv/m-st-ext.html">M extension</a>. Each program’s image must be smaller than <math class="rule-math" aria-label="P max"><msub><mi>P</mi><mtext>max</mtext></msub></math>: four bytes per instruction plus embedded-data bytes.</p>
 
           <h3 id="code-and-memory">Code and memory</h3>
           <p>Code occupies a separate, immutable instruction address space. Instruction <code>i</code> is at <code>0x1000 + 4 × i</code>. Memory occupies <code>0x000000–0xFFFFFF</code> (16 MiB).</p>

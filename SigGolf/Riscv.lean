@@ -21,7 +21,7 @@ structure Image where
   data : List Byte
   deriving Repr
 
-/-- The size bounded by `MAX_IMAGE_BYTES`. -/
+/-- The size bounded by `MAX_PROGRAM_BYTES`. -/
 def Image.byteSize (image : Image) : Nat := 4 * image.code.length + image.data.length
 
 /-- Embedded data sits at the top of memory, 16-byte aligned; `sp` starts here. -/
@@ -63,10 +63,10 @@ instance (layout : Layout) (sizes : Sizes) (image : Image) :
 
 /-- An image within the size bound whose layout fits below its data. -/
 def Image.Valid (image : Image) (sizes : Sizes) (layout : Layout) : Prop :=
-  image.byteSize < MAX_IMAGE_BYTES ∧ layoutValid layout sizes image
+  image.byteSize < MAX_PROGRAM_BYTES ∧ layoutValid layout sizes image
 
 instance (image : Image) (sizes : Sizes) (layout : Layout) : Decidable (image.Valid sizes layout) :=
-  inferInstanceAs (Decidable (image.byteSize < MAX_IMAGE_BYTES ∧ layoutValid layout sizes image))
+  inferInstanceAs (Decidable (image.byteSize < MAX_PROGRAM_BYTES ∧ layoutValid layout sizes image))
 
 /-- `bytes` bytes at `address` lie entirely in memory. -/
 def rangeValid (address : BitVec 64) (bytes : Nat) : Bool :=

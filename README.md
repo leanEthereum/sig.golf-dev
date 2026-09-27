@@ -20,7 +20,7 @@ Design a **stateless hash-based signature scheme** minimizing `S × C`: signatur
 | `LIFETIME`        | 2^32 signing requests |
 | `SECURITY_BITS`   |                   127 |
 | `CYCLE_LIMIT`     |           2^32 cycles |
-| `MAX_IMAGE_BYTES` |            2^20 bytes |
+| `MAX_PROGRAM_BYTES` |            2^20 bytes |
 
 Every object has a fixed size in bytes:
 
@@ -139,7 +139,7 @@ The total hash-call count includes key generation, signing, `A`’s queries, and
 
 Use [RV64I](https://docs.riscv.org/reference/isa/v20260120/unpriv/rv64.html) and the [M extension](https://docs.riscv.org/reference/isa/v20260120/unpriv/m-st-ext.html).
 
-Each program satisfies **`4 × instruction count + embedded-data bytes < MAX_IMAGE_BYTES`**.
+Each program satisfies **`4 × instruction count + embedded-data bytes < MAX_PROGRAM_BYTES`**.
 
 ### Code and memory
 

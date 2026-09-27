@@ -24,12 +24,12 @@ example : accessValid 0 8 = true ∧ accessValid 1 8 = false := by decide
 example : rangeValid 0xfffff8 8 = true ∧ rangeValid 0xfffff8 9 = false := by decide
 example : rangeValid 0xffffffffffffffff 2 = false := by decide
 example : accessValid 0x100000 8 = true ∧ accessValid 0x1000000 8 = false := by decide
-example : MEMORY_BYTES = 16777216 ∧ MAX_IMAGE_BYTES = 1048576 := by decide
+example : MEMORY_BYTES = 16777216 ∧ MAX_PROGRAM_BYTES = 1048576 := by decide
 example : Sizes.Valid ⟨2 ^ 14, 1, 0⟩ ∧ ¬ Sizes.Valid ⟨2 ^ 14 + 1, 1, 0⟩ ∧
     Sizes.Valid ⟨1, 1, 2 ^ 17⟩ ∧ ¬ Sizes.Valid ⟨1, 1, 2 ^ 17 + 1⟩ ∧ Sizes.Valid ⟨0, 0, 0⟩ := by
   unfold Sizes.Valid MAX_SIGNATURE_BYTES MAX_WITNESS_BYTES MAX_CACHE_BYTES; decide
 example : signatureBase ⟨1, 1, 0⟩ = 0x60 ∧ signatureBase ⟨1, 1, 9⟩ = 0x70 := by decide
-example (image : Image) (sizes : Sizes) (h : image.byteSize = MAX_IMAGE_BYTES) :
+example (image : Image) (sizes : Sizes) (h : image.byteSize = MAX_PROGRAM_BYTES) :
     ¬ image.Valid sizes (standardLayout sizes) := by
   intro valid
   have bound := valid.1

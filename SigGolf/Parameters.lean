@@ -34,7 +34,7 @@ def CYCLE_LIMIT : Nat := 2 ^ 32
 def MEMORY_BYTES : Nat := 2 ^ 24
 
 /-- Bound on `4 × instructions + embedded data bytes` per program. -/
-def MAX_IMAGE_BYTES : Nat := 2 ^ 20
+def MAX_PROGRAM_BYTES : Nat := 2 ^ 20
 
 /-- Largest declarable cache, witness, and signature. -/
 def MAX_CACHE_BYTES : Nat := 2 ^ 17
