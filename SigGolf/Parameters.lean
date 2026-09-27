@@ -82,7 +82,7 @@ structure Layout where
 
 /-- Declared sizes within the competition bounds. -/
 def Sizes.Valid (sizes : Sizes) : Prop :=
-  1 ≤ sizes.signature ∧ sizes.signature ≤ MAX_SIGNATURE_BYTES ∧ sizes.witness ≤ MAX_WITNESS_BYTES ∧
+  sizes.signature ≤ MAX_SIGNATURE_BYTES ∧ sizes.witness ≤ MAX_WITNESS_BYTES ∧
     sizes.cache ≤ MAX_CACHE_BYTES
 
 /-- Verification is also charged one cycle per started 256-byte block of witness. -/
