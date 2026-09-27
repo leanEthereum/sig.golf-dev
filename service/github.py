@@ -242,7 +242,7 @@ def publish_verified(api: Github, pr: dict, result: dict, contract: str,
             {'path': candidate['source_path'], 'mode': '040000', 'type': 'tree', 'sha': snapshot_tree}]})
         if not SHA.fullmatch(new_tree.get('sha', '')):
             raise GithubError('invalid publication tree')
-        message = f"Verify PR #{pr['number']}: {candidate['score']} (beta)"
+        message = f"Verify PR #{pr['number']}: {candidate['score']}"
         commit_obj = api.post(f'/repos/{REPO}/git/commits',
                               {'message': message, 'tree': new_tree['sha'], 'parents': [head]})
         if not SHA.fullmatch(commit_obj.get('sha', '')):

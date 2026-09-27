@@ -133,7 +133,7 @@ def once(api: Github, work_root: Path, local_records: Path, state_file: Path, se
             continue
         if checked_status(api, commit, context, login) in {'success', 'failure'}:
             continue
-        api.status(commit, 'pending', 'Checking the beta submission', context)
+        api.status(commit, 'pending', 'Checking the submission', context)
         with shared_verify_slot():
             result = run_verifier(pr, contract, work_root, secret_dir)
         status = result.get('status')

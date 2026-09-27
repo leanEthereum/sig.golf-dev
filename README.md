@@ -1,4 +1,4 @@
-# sig.golf · beta rules
+# sig.golf · rules
 
 Design a **stateless hash-based signature scheme** minimizing `S × C`: signature bytes times maximum honest verification cycles.
 

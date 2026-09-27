@@ -1,26 +1,129 @@
-# sig.golf beta
+# sig.golf
 
-Sig.golf is a Lean-certified competition for stateless hash-based signatures. The score is signature bytes times maximum honest RISC-V verification cycles.
+> A Lean-certified competition for stateless hash-based signature schemes. You submit four RISC-V programs plus a Lean 4 proof that they satisfy the organizer's contract. The score is S × C: signature bytes times the certified maximum honest verification cycles. Lower is better. The contract still changes often, and results are tied to the contract commit they were verified against.
 
-Cycle costs: 1 per instruction, 4 per multiplication or division (MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU, and their W forms), 8 per HASH compression, 1 per HALT, plus ceil(W / 256) per verification for the witness. HASH needs 8-byte-aligned input and output addresses and an input length in bytes (a1) that is a nonzero multiple of 64.
+This file is a guide for agents. The rules page is the specification; the Lean files are the contract. When they disagree with anything here, they win.
 
-Rules: /rules.html
-Formal definitions: https://github.com/leanEthereum/sig.golf-dev/tree/beta
-Submit by opening a PR against beta: https://github.com/leanEthereum/sig.golf-submissions/pulls
-PR layout: https://github.com/leanEthereum/sig.golf-submissions/blob/beta/README.md
+## Links
 
-The claim.json file declares S, W, K (cache bytes), C, and one shared layout with six nonnegative byte offsets: message, secret_key, public_key, cache, signature, witness. All offsets are 8-byte aligned; buffers must be disjoint and fit below embedded data in every program. The submitted Lean proof must bind its layout to these exact values. S is at most 16,384 bytes; W and K are at most 131,072.
+- Rules: https://beta.sig.golf/rules.html (identical to README.md in the dev repository)
+- Contract, Lean 4, branch `beta`: https://github.com/leanEthereum/sig.golf-dev/tree/beta — read `SigGolf/Parameters.lean`, `Oracle.lean`, `Riscv.lean`, `Programs.lean`, `Security.lean`, `Statements.lean`, in that order. Each file opens with a short summary.
+- Submissions, one pull request per attempt against branch `beta`: https://github.com/leanEthereum/sig.golf-submissions
+- Leaderboard: https://beta.sig.golf/ — verified results as JSON: https://beta.sig.golf/records.json
+- Presentation template: https://beta.sig.golf/examples/presentation-template/presentation.json and scheme.svg
 
-RISC-V system calls: ECALL with t0 = 0 is HASH (a0 input address, a1 length in bytes, a2 output address); t0 = 1 halts with exit code a0, where 0 means success (verify accepts). Unknown services, invalid HASH arguments, nonzero exit codes, EBREAK, invalid instruction encodings, and memory or instruction-fetch faults fail the program (verify rejects). Invalid fetches or encodings cost zero cycles; other faults cost one cycle and make no oracle call.
+## What you build
 
-Verified results are published in /records.json.
+Four RV64IM program images, each with optional embedded data, sharing one memory layout:
 
-Include presentation/ beside submission/ in every PR. Copy and customize:
-- /examples/presentation-template/presentation.json
-- /examples/presentation-template/scheme.svg
+| Program | Inputs | Output | Runs on |
+| --- | --- | --- | --- |
+| keygen | secret key | public key, cache | signer's enclave |
+| sign | secret key, cache, message | signature | signer's enclave |
+| expand | message, public key, signature | witness | prover host |
+| verify | message, public key, witness | accept or reject | zkVM |
 
-Explain the scheme briefly and draw its signature layout, encoding, authentication, and witness expansion.
+Fixed sizes: message 32 B, secret key 32 B, public key 16 B. You choose the cache size K ≤ 128 KiB, the signature size S ≤ 16 KiB, and the witness size W ≤ 128 KiB, and you claim a cycle bound C < 2^32.
 
-Profile N accepting runs: samples=N; instructions={mnemonic: total}, with HALT=N; hashes={input_bits: total_calls}. Describe sampling in method. Submit integer totals, not averages; the site computes per-run counts and cycles.
+The only hash is the syscall HASH, a random oracle on inputs of 64·k bytes returning 32 bytes. Everything cryptographic must go through it: there is no other source of hardness in the model, and the adversary has unbounded computation apart from oracle calls.
 
-Each file ≤64 KiB. SVG must be static, without scripts or external resources. Displayed as “Provided by submission · not verified”; no effect on scoring.
+## Costs
+
+| Item | Cycles |
+| --- | --- |
+| Ordinary instruction | 1 |
+| MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU and their W forms | 4 |
+| HASH, per 64-byte block | 8, no instruction charge |
+| HALT | 1 |
+| Witness, added once to verify | ⌈W / 256⌉ |
+
+Memory faults, misaligned accesses, invalid HASH arguments, unknown syscalls, EBREAK, and HALT with a nonzero code fail the program at 1 cycle with no oracle call; an invalid fetch or encoding fails at 0 cycles. A failed verify is a rejection.
+
+Honest budgets, in 64-byte compressions: keygen 2^20, sign 2^17, expand 2^20. Verify has no budget; its cycles are the score.
+
+## What the certificate proves
+
+`SigGolf.Certificate submission C` has six fields. In plain terms:
+
+1. **admission** — sizes within bounds, each image under 2^20 bytes (4 × instructions + data), six 8-byte-aligned, non-overlapping buffers below the embedded data.
+2. **completeness** — for every secret key, with probability at least 1 − 2^-128 over the oracle, keygen, sign, expand, verify succeed for every message under that one oracle.
+3. **compressionBudgets** — for every secret key and P in {keygen, sign, expand}, E[2^(N_P / BUDGET_P)] ≤ 2 over a fresh oracle and a uniform message, where N_P is P's compressions in the honest pipeline.
+4. **verificationCycles** — for every oracle, key, and message where the honest pipeline succeeds, verify's cycles plus the witness charge are at most C.
+5. **security** — the forgery game below, at every hash budget Q ≥ 1: Pr[win with at most Q total calls] ≤ Q / 2^127.
+6. **termination** — every program halts in fewer than 2^32 cycles on every typed input and every oracle, including adversarial caches, signatures, and witnesses.
+
+## The security game, condensed
+
+Sample the oracle and a uniform secret key; run keygen; give the adversary the public key and the cache. The adversary may query the oracle, and may ask for signatures on messages of its choice with a cache of its choice, up to 2^32 requests. It finally submits either a witness for a message never signed, or a (message, signature) pair the signing oracle never returned; the latter is checked through expand and verify. Every hash call in the whole experiment counts toward Q: keygen's, the signing oracle's, the adversary's own, and the final check's.
+
+## Consequences that bite
+
+These follow from the contract; each has cost real submissions.
+
+- **The cache is untrusted and the signature form is strongly unforgeable.** If sign copies cache bytes into the signature without authenticating them, an adversary asks for a signature with a corrupted cache, repairs the public part from the honest cache, and submits a pair the oracle never returned. Store a 32-byte MAC over the cache in the cache at keygen, keyed from the secret key and domain-separated, and check it in sign. Or ignore the cache entirely.
+- **Every signature byte must be checked.** Unused bits, non-canonical digit encodings, or an unsigned salt are malleability, and malleability is a forgery under the signature form. The cheap place to reject non-canonical signatures is expand, since it runs before verify in that check.
+- **C is a worst case, not an average.** It must hold for every oracle, key, and message on which the honest pipeline succeeds, and completeness must hold for all messages at once, so per-message failure has to be astronomically small. A grinder in sign may retry, but it needs a hard cap, and if exhaustion means failure the cap must be large enough; if exhaustion means a fallback, the fallback's verification cost is part of C.
+- **Budgets are exponential moments.** Geometric retry costs are fine as long as the mean is well below the budget and the tail is capped by termination at under 2^29 compressions. Roughly sixteen bits of salt grinding fit the sign budget.
+- **expand adds advice, not information.** Anything expand can compute from the message, public key, and signature, the adversary can compute too, and verify must recheck everything it is given. Use expand to unpack tightly packed digits, precompute Merkle-schedule bookkeeping, or restore nodes that revealed leaves determine. Witness bytes are nearly free: 1 cycle per 256 bytes.
+- **Sixteen-byte public keys leave one bit of slack.** Generic preimage search on the key already costs Q / 2^128 against a bound of Q / 2^127. Domain-separate and tweak every hash so no multi-target term appears; the oracle has no implicit domain separation, and the input length is part of the input.
+- **Hash calls and compressions differ.** Budgets count 64-byte compressions; the game counts calls, and one HASH of many blocks is one call.
+- **Termination is for all inputs.** Loops in verify and expand must be bounded by the witness or signature format, not by trusting its contents. Sign must terminate on any cache.
+- **Sign is deterministic.** There are no coins. Randomization must come from the secret key and the message, for example a salt H(domain ‖ secret key ‖ message) carried in the signature.
+
+## RISC-V quick reference
+
+- RV64IM only; 32-bit encodings; no CSR access; FENCE is a no-op; EBREAK fails.
+- Code is a separate immutable space: instruction i at 0x1000 + 4·i. Data memory is 0x000000–0xFFFFFF (16 MiB), byte-addressed, little-endian, all accesses aligned to their size.
+- Embedded data of D bytes loads at data_base = 16 · ⌊(0x1000000 − D) / 16⌋. At start, sp = data_base, PC = 0x1000, all other registers zero, memory zero except embedded data and the program's inputs at their offsets.
+- Syscall via ECALL with t0 selecting the service: t0 = 0 is HASH with a0 = input address, a1 = length in bytes (nonzero multiple of 64), a2 = output address, both addresses 8-byte aligned and in range; the 32-byte answer is written little-endian, registers are preserved, PC advances by 4. t0 = 1 is HALT with exit code a0; 0 means success and, for verify, acceptance.
+
+## How to submit
+
+Open a pull request against branch `beta` of the submissions repository. The verifier reads only these paths:
+
+```
+submission/claim.json           required, at most 512 bytes
+submission/Solution.lean        required
+submission/SigGolfCandidate/…   optional helper modules, .lean only, any depth
+presentation/presentation.json  optional, shown on the site, never verified
+presentation/scheme.svg         optional, only with "diagram": true
+```
+
+`claim.json` has exactly these keys, all nonnegative integers, the offsets 8-byte aligned and the buffers disjoint:
+
+```json
+{"S": 7856, "W": 7856, "K": 131072, "C": 5000000,
+ "layout": {"message": 0, "secret_key": 32, "public_key": 64, "cache": 96,
+            "signature": 131168, "witness": 139024}}
+```
+
+`Solution.lean` must define and prove exactly this, with the same numbers as `claim.json`. The verifier generates its own `SigGolf.Challenge` with these statements and `sorry`, then compares yours against it, so do not import `SigGolf.Challenge`:
+
+```lean
+import SigGolf
+-- import SigGolfCandidate.YourModules as needed
+
+namespace SigGolf.Challenge
+
+noncomputable def submission : SigGolf.Submission := ⟨sizes, layout, images⟩
+
+theorem signature_bytes : submission.sizes.signature = 7856 := by decide
+theorem witness_bytes : submission.sizes.witness = 7856 := by decide
+theorem cache_bytes : submission.sizes.cache = 131072 := by decide
+theorem layout_offsets : submission.layout =
+  { message := 0, secretKey := 32, publicKey := 64, cache := 96,
+    signature := 131168, witness := 139024 } := by decide
+theorem certificate : SigGolf.Certificate submission 5000000 := …
+
+end SigGolf.Challenge
+```
+
+Images are `SigGolf.Riscv.Image` values: a list of 32-bit instruction words and a list of data bytes. Write them as literals or generate them in Lean; the proof must be about the exact term.
+
+Policy, enforced before any Lean runs: at most 1000 entries, 8 MiB per file, 16 MiB total; no symlinks; module names are ASCII identifiers; no `prelude` or `module` headers; imports only from `SigGolf` and its six modules, your own `SigGolfCandidate.*` modules, and `Mathlib`, `ToMathlib`, `VCVio`, `RiscvZkvm`, `Batteries`, `Lean`, `Init`, `Std`.
+
+Proof checking, in a sandbox without network: the organizer's challenge is built and exported first, then your solution is built, exported, compared statement by statement against the challenge, and replayed through the Lean kernel. The theorems and the `submission` definition may depend only on the axioms `propext`, `Classical.choice`, and `Quot.sound`: no `sorry`, no `native_decide`. Toolchain `leanprover/lean4:v4.33.1`; Mathlib, VCVio, and riscv-zkvm are pinned in the dev repository's `lake-manifest.json`, and the prebuilt dependency cache is reused, so develop against those exact revisions. Limits: 4 hours wall clock, 24 GiB, two CPUs. A verified PR gets a success status on its commit and an entry in records.json with S, W, K, C, the score, the commit, and the contract commit; a new best under the current contract is flagged as a record. Put a line `Assisted by: <model or tool>` in the PR body to be credited on the site.
+
+## Presentation, optional
+
+`presentation.json` (≤ 64 KiB): `{"version": 1, "summary": …, "diagram": bool, "facts": [{"label": …, "value": …}], "profile": {…}}`. Summary ≤ 500 characters; at most 8 facts, labels ≤ 40 and values ≤ 120 characters. The profile reports totals over N accepting verify runs, not averages: `samples` = N (1 to 1,000,000), `method` (≤ 200 characters, how runs were sampled), `instructions` = {mnemonic: total} with `HALT` equal to N and no HASH, ECALL, or EBREAK keys, `hashes` = {input bit length: total calls} with bit lengths that are nonzero multiples of 512. The site derives per-run counts and cycles and ignores a presentation whose profile exceeds C cycles per run. `scheme.svg` (≤ 64 KiB): static SVG with a viewBox, basic shapes, text, and gradients only; no scripts, styles, external references, or data URLs. Set `"diagram": true` exactly when the SVG is present. Invalid presentation files are ignored, never rejected, and never affect the score.
