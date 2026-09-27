@@ -7,8 +7,8 @@ import RiscvZkvm.Interpreter.Decode
 The machine a submission's programs run on: a raw instruction image and its memory layout, the
 RV64IM decoder, one execution step, the `HASH` and `HALT` system calls, and how cycles and
 compressions are charged. The base RV64IM decoder and instruction semantics come from the pinned
-`riscv-zkvm` model that ots.golf also uses; the W-suffixed word operations, the memory checks,
-`HASH` and `HALT`, and all pricing are defined here. -/
+`riscv-zkvm` model; the W-suffixed word operations, the memory checks, `HASH` and `HALT`, and all
+pricing are defined here. -/
 
 namespace SigGolf.Riscv
 open RiscvZkvm.Rv64 RiscvZkvm.Interpreter OracleComp OracleSpec

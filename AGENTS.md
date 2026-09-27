@@ -1,7 +1,7 @@
 # Agent instructions
 
 - Work on `beta`. Never commit on `main` without the user's explicit approval.
-- Push and deploy only the `beta` branch. Keep ots.golf live while deploying sig.golf.
+- Push and deploy only the `beta` branch. Keep the host's other sites live while deploying.
 - `README.md` is the single beta rules document. Keep it concise; distinguish
   organizer decisions from proposals and unresolved choices.
 - The old implementation and rules remain in Git history and on `main`. Do not
@@ -9,5 +9,5 @@
   into beta.
 - Keep the repository minimal. Add implementation, dependencies, tests, or
   website files only when the corresponding work is requested.
-- Future website work should follow ots.golf's style; ask before substantial
+- Future website work should keep the current style; ask before substantial
   visible design changes.
