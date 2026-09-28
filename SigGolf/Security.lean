@@ -85,7 +85,7 @@ end SigningLog
 /-! ### The experiment -/
 
 /-- Whether the forgery verifies under the original public key and is fresh with respect to the
-log (README step 4). -/
+log. -/
 def Submission.checkForgery (submission : Submission) (pk : PublicKey)
     (log : SigningLog submission.sizes) : Forgery submission.sizes → OracleComp HashSpec Bool
   | .witness message witness => do

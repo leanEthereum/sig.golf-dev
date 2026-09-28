@@ -18,19 +18,19 @@ def Submission.Admission (submission : Submission) : Prop :=
 instance (submission : Submission) : Decidable submission.Admission := by
   unfold Submission.Admission; infer_instance
 
-/-- **Completeness** (README 1). -/
+/-- **Completeness.** -/
 def Submission.Completeness (submission : Submission) : Prop :=
   ∀ secretKey,
     1 - FAILURE ≤ Pr[= true | withRandomOracle (submission.everyMessageSucceeds secretKey)]
 
-/-- **Compression budgets** (README 2): `E_{H,M}[2^(N_P / BUDGET_P)] ≤ 2`. -/
+/-- **Compression budgets:** `E_{H,M}[2^(N_P / BUDGET_P)] ≤ 2`. -/
 def Submission.CompressionBudgets (submission : Submission) : Prop :=
   ∀ secretKey program (budget : Nat), program.budget = some budget →
     expectedValue (do let message ← ($ᵗ Message : ProbComp Message)
                       withRandomOracle (submission.honest secretKey message))
       (fun result => (2 : ENNReal) ^ ((result.compressions program : ℝ) / budget)) ≤ 2
 
-/-- **Verification cycles** (README 3). Only honest witnesses are bounded here; arbitrary ones fall
+/-- **Verification cycles.** Only honest witnesses are bounded here; arbitrary ones fall
 under `Termination`. -/
 def Submission.VerificationCycles (submission : Submission) (C : Nat) : Prop :=
   ∀ (hash : Hash) secretKey message,
