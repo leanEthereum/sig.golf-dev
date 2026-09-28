@@ -63,7 +63,8 @@ def readBuffer (state : MachineState) (address n : Nat) : Bytes n :=
 
 /-! ### Decoding -/
 
-/-- The 32-bit, `W`-suffixed register operations the upstream decoder lacks: `ADDW` to `REMUW`. -/
+/-- The 32-bit, `W`-suffixed register operations `ADDW` to `REMUW`, decoded here in place of the
+upstream decoder, which models only two of the ten. -/
 inductive WordOp where
   | add | sub | sll | srl | sra | mul | div | divu | rem | remu
   deriving DecidableEq
