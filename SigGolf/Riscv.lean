@@ -1,5 +1,6 @@
 import SigGolf.Oracle
 import RiscvZkvm.Rv64.Execution
+import RiscvZkvm.Rv64.StepOn
 import RiscvZkvm.Interpreter.Decode
 
 /-! # RISC-V
@@ -13,60 +14,45 @@ pricing are defined here. -/
 namespace SigGolf.Riscv
 open RiscvZkvm.Rv64 RiscvZkvm.Interpreter OracleComp OracleSpec
 
-/-! ### Images and layout -/
+/-! ### Images -/
 
 /-- A program: 32-bit instruction encodings and the bytes loaded at `dataBase`. -/
 structure Image where
   code : List (BitVec 32)
   data : List Byte
-  deriving Repr
 
-/-- The size bounded by `MAX_PROGRAM_BYTES`. -/
+/-- `4 × instruction count + embedded-data bytes`, bounded by `MAX_PROGRAM_BYTES`. -/
 def Image.byteSize (image : Image) : Nat := 4 * image.code.length + image.data.length
 
 /-- Embedded data sits at the top of memory, 16-byte aligned; `sp` starts here. -/
 def dataBase (image : Image) : Nat := 16 * ((MEMORY_BYTES - image.data.length) / 16)
-def signatureBase (sizes : Sizes) : Nat := 0x60 + 8 * ((sizes.cache + 7) / 8)
-def witnessBase (sizes : Sizes) : Nat := signatureBase sizes + 8 * ((sizes.signature + 7) / 8)
 
-/-- A reference layout: message, secret key, public key, then the cache, signature, and witness in sequence. Submissions may declare any valid layout. -/
-def standardLayout (sizes : Sizes) : Layout :=
-  ⟨0, 0x20, 0x40, 0x60, signatureBase sizes, witnessBase sizes⟩
+/-! ### Layout -/
 
+/-- Each object's buffer as `(address, length)`. -/
 def layoutBuffers (layout : Layout) (sizes : Sizes) : List (Nat × Nat) :=
   [(layout.message, 32), (layout.secretKey, 32), (layout.publicKey, 16),
    (layout.cache, sizes.cache), (layout.signature, sizes.signature),
    (layout.witness, sizes.witness)]
 
-def disjointBuffers (left right : Nat × Nat) : Prop :=
+/-- Two buffers do not overlap; an empty buffer overlaps nothing. -/
+abbrev DisjointBuffers (left right : Nat × Nat) : Prop :=
   left.2 = 0 ∨ right.2 = 0 ∨ left.1 + left.2 ≤ right.1 ∨ right.1 + right.2 ≤ left.1
 
-instance (left right : Nat × Nat) : Decidable (disjointBuffers left right) := by
-  unfold disjointBuffers
-  infer_instance
-
-def buffersDisjoint : List (Nat × Nat) → Bool
-  | [] => true
-  | first :: rest =>
-      rest.all (fun second => decide (disjointBuffers first second)) && buffersDisjoint rest
-
 /-- Every buffer is 8-byte aligned and ends at or below the embedded data, and no two overlap. -/
-def layoutValid (layout : Layout) (sizes : Sizes) (image : Image) : Prop :=
-  (layoutBuffers layout sizes).all (fun buffer =>
-    decide (buffer.1 % 8 = 0 ∧ buffer.1 + buffer.2 ≤ dataBase image)) = true ∧
-  buffersDisjoint (layoutBuffers layout sizes) = true
-
-instance (layout : Layout) (sizes : Sizes) (image : Image) :
-    Decidable (layoutValid layout sizes image) := by
-  unfold layoutValid
-  infer_instance
+abbrev LayoutValid (layout : Layout) (sizes : Sizes) (image : Image) : Prop :=
+  (∀ buffer ∈ layoutBuffers layout sizes,
+    buffer.1 % 8 = 0 ∧ buffer.1 + buffer.2 ≤ dataBase image) ∧
+  (layoutBuffers layout sizes).Pairwise DisjointBuffers
 
 /-- An image within the size bound whose layout fits below its data. -/
-def Image.Valid (image : Image) (sizes : Sizes) (layout : Layout) : Prop :=
-  image.byteSize < MAX_PROGRAM_BYTES ∧ layoutValid layout sizes image
+abbrev Image.Valid (image : Image) (sizes : Sizes) (layout : Layout) : Prop :=
+  image.byteSize < MAX_PROGRAM_BYTES ∧ LayoutValid layout sizes image
 
-instance (image : Image) (sizes : Sizes) (layout : Layout) : Decidable (image.Valid sizes layout) :=
-  inferInstanceAs (Decidable (image.byteSize < MAX_PROGRAM_BYTES ∧ layoutValid layout sizes image))
+/-! ### Memory -/
+
+/-- Fresh registers and memory, all zero, with `PC` at the first instruction. -/
+def initialMachine : MachineState := { regs := fun _ => 0, mem := fun _ => 0, pc := 0x1000 }
 
 /-- `bytes` bytes at `address` lie entirely in memory. -/
 def rangeValid (address : BitVec 64) (bytes : Nat) : Bool :=
@@ -76,21 +62,27 @@ def rangeValid (address : BitVec 64) (bytes : Nat) : Bool :=
 def accessValid (address : BitVec 64) (bytes : Nat) : Bool :=
   rangeValid address bytes && decide (address.toNat % bytes = 0)
 
+/-- The `n` bytes at `address`, least significant first. -/
+def readBuffer (state : MachineState) (address n : Nat) : Bytes n :=
+  BitVec.ofNat (8 * n) ((List.range n).foldl
+    (fun acc i => acc + (state.getByte (BitVec.ofNat 64 (address + i))).toNat * 2 ^ (8 * i)) 0)
+
 /-! ### Decoding -/
 
-/-- Extensions needed to cover the complete RV64IM word-operation family. -/
+/-- The 32-bit, `W`-suffixed register operations the upstream decoder lacks: `ADDW` to `REMUW`. -/
 inductive WordOp where
   | add | sub | sll | srl | sra | mul | div | divu | rem | remu
-  deriving DecidableEq, Repr
+  deriving DecidableEq
 
 /-- A decoded instruction: one from the upstream model, or a word operation it lacks. -/
 inductive Instruction where
   | base (instruction : Instr)
   | word (op : WordOp) (rd rs1 rs2 : Reg)
   | sraiw (rd rs1 : Reg) (shift : BitVec 5)
-  deriving Repr
 
-/-- The program contains actual 32-bit encodings, never assembler pseudo-instructions. -/
+/-- Decode one 32-bit encoding: `ECALL` and `EBREAK` exactly, the W-suffixed operations and
+`SRAIW`, then the upstream decoder. Other SYSTEM encodings, the CSR instructions, do not decode;
+assembler pseudo-instructions have no encoding. -/
 def decodeInstruction (word : BitVec 32) : Option Instruction := do
   let opcode := (word.extractLsb' 0 7).toNat
   let rd := regOfBits (word.extractLsb' 7 5)
@@ -119,8 +111,10 @@ def decodeInstruction (word : BitVec 32) : Option Instruction := do
   else if opcode = 0x1b && f3 = 5 && f7 = 0x20 then
     return .sraiw rd rs1 (word.extractLsb' 20 5)
   else
-    return .base (← RiscvZkvm.Interpreter.decode word)
+    return .base (← decode word)
 
+/-- The 32-bit result of a `W` operation: shifts use the low five bits of `b`; division by zero
+gives all ones and remainder by zero gives `a`, as RISC-V specifies. -/
 def wordResult (op : WordOp) (a b : BitVec 32) : BitVec 32 :=
   match op with
   | .add => a + b
@@ -136,21 +130,19 @@ def wordResult (op : WordOp) (a b : BitVec 32) : BitVec 32 :=
 
 /-! ### One step -/
 
-/-- Every data access is bounds- and alignment-checked; address zero is an ordinary valid address. -/
-def memoryArgumentsValid (state : MachineState) : Instr → Bool
-  | .LB _ rs off | .LBU _ rs off | .SB rs _ off =>
-      accessValid (state.getReg rs + signExtend12 off) 1
-  | .LH _ rs off | .LHU _ rs off | .SH rs _ off =>
-      accessValid (state.getReg rs + signExtend12 off) 2
-  | .LW _ rs off | .LWU _ rs off | .SW rs _ off =>
-      accessValid (state.getReg rs + signExtend12 off) 4
-  | .LD _ rs off | .SD rs _ off =>
-      accessValid (state.getReg rs + signExtend12 off) 8
-  | _ => true
+/-- Every data access is bounds- and alignment-checked; address zero is an ordinary valid
+address. -/
+def memoryArgumentsValid (state : MachineState) (instruction : Instr) : Bool :=
+  match memAccess state instruction with
+  | some (address, width, _) => accessValid address width
+  | none => true
 
+/-- One ordinary instruction. Of the first two arms only `EBREAK` is reachable: `execute` handles
+`ECALL` first, and `decodeInstruction` never produces CSR or pseudo-instructions. They are listed
+so this does not depend on that. -/
 def ordinaryStep (state : MachineState) : Instruction → Option MachineState
-  | .base (.ECALL) | .base (.EBREAK) | .base (.CSRS _ _) => none
-  | .base (.LI _ _) | .base (.MV _ _) | .base (.NOP) => none
+  | .base .ECALL | .base .EBREAK | .base (.CSRS _ _) => none
+  | .base (.LI _ _) | .base (.MV _ _) | .base .NOP => none
   | .base instruction =>
       if memoryArgumentsValid state instruction then some (execInstrBr state instruction) else none
   | .word op rd rs1 rs2 =>
@@ -160,7 +152,8 @@ def ordinaryStep (state : MachineState) : Instruction → Option MachineState
       let value := ((state.getReg rs).truncate 32).sshiftRight shift.toNat
       some ((state.setReg rd (value.signExtend 64)).setPC (state.pc + 4))
 
-/-- Multiplication, division, and remainder instructions cost four cycles; every other ordinary instruction costs one. `ECALL` is priced in `execute`. -/
+/-- Multiplication, division, and remainder instructions cost four cycles; every other ordinary
+instruction costs one. `ECALL` is priced in `execute`. -/
 def instructionCycles : Instruction → Nat
   | .base (.MUL ..) | .base (.MULH ..) | .base (.MULHSU ..) | .base (.MULHU ..)
   | .base (.DIV ..) | .base (.DIVU ..) | .base (.REM ..) | .base (.REMU ..) => 4
@@ -169,25 +162,25 @@ def instructionCycles : Instruction → Nat
 
 /-- The instruction at `PC`: code starts at `0x1000`, four bytes per instruction. -/
 def fetch (image : Image) (state : MachineState) : Option Instruction := do
-  if state.pc.toNat < 0x1000 || state.pc.toNat % 4 != 0 then none else
-    let word ← image.code[(state.pc.toNat - 0x1000) / 4]?
-    decodeInstruction word
+  guard (0x1000 ≤ state.pc.toNat ∧ state.pc.toNat % 4 = 0)
+  let word ← image.code[(state.pc.toNat - 0x1000) / 4]?
+  decodeInstruction word
 
 /-! ### HASH -/
 
-/-- HASH reads whole 64-byte blocks: both addresses are 8-byte aligned, the byte length is a nonzero multiple of 64, and input and output lie in memory. -/
+/-- HASH reads whole 64-byte blocks: both addresses are 8-byte aligned, the byte length is a
+nonzero multiple of 64, and input and output lie in memory. -/
 def hashArgumentsValid (state : MachineState) : Bool :=
   let source := state.getReg .x10
   let bytes := (state.getReg .x11).toNat
   let destination := state.getReg .x12
-  decide (source.toNat % 8 = 0) && decide (0 < bytes ∧ bytes % 64 = 0) && rangeValid source bytes &&
-    accessValid destination 8 && rangeValid destination 32
+  decide (source.toNat % 8 = 0) && decide (0 < bytes ∧ bytes % 64 = 0) &&
+    rangeValid source bytes && decide (destination.toNat % 8 = 0) && rangeValid destination 32
 
-/-- The oracle input is the `a1` input bytes in increasing address order, `a1 / 64` blocks. -/
+/-- The `a1` bytes at address `a0`, least significant first, as `a1 / 64` blocks. -/
 def hashInput (state : MachineState) : Query :=
   let n := (state.getReg .x11).toNat / 64 - 1
-  ⟨n, BitVec.ofNat (8 * (64 * (n + 1))) ((List.range (64 * (n + 1))).foldl (fun acc i =>
-    acc + (state.getByte (state.getReg .x10 + BitVec.ofNat 64 i)).toNat * 2 ^ (8 * i)) 0)⟩
+  ⟨n, readBuffer state (state.getReg .x10).toNat (64 * (n + 1))⟩
 
 /-- Write the 32-byte answer at `a2`, little-endian, and advance `PC`. -/
 def writeHash (state : MachineState) (answer : BitVec 256) : MachineState :=
@@ -197,33 +190,37 @@ def writeHash (state : MachineState) (answer : BitVec 256) : MachineState :=
 
 /-! ### Execution and costs -/
 
-/-- How a run ended: `HALT` with exit code 0, any fault or nonzero exit code, or cut off by the observation fuel. -/
+/-- How a run ended: `HALT` with exit code 0; any fault or nonzero exit code; or still running
+when the step limit was reached. -/
 inductive Exit where
   | success | failure | unfinished
-  deriving DecidableEq, Repr
+  deriving DecidableEq
 
-/-- A finished or cut-off run with its final state, cycles, and compressions. Hash calls are not counted here; the security experiment counts them at the oracle. -/
+/-- A finished or cut-off run with its final state, cycles, and compressions. Hash calls are not
+counted here; the security experiment counts them at the oracle. -/
 structure Execution where
   exit : Exit
   state : MachineState
-  cycles : Nat := 0
-  compressions : Nat := 0
+  cycles : Nat
+  compressions : Nat
 
 /-- Add one instruction's cycles and compressions. -/
 def Execution.charge (result : Execution) (cycles blocks : Nat) : Execution :=
   { result with cycles := cycles + result.cycles, compressions := blocks + result.compressions }
 
-/-- Fuel is a logical observation depth, not a VM timeout. Certification must exclude `unfinished` for every fixed oracle. -/
-def execute : Nat → Image → MachineState → OracleComp HashSpec Execution
-  | 0, _, state => pure ⟨.unfinished, state, 0, 0⟩
-  | fuel + 1, image, state =>
+/-- Run at most `steps` instructions from `state`, answering each HASH by querying `H`. A program
+still running after `steps` instructions is reported `unfinished`; since every step costs at least
+one cycle, `Termination` rules that out within `CYCLE_LIMIT` steps. -/
+def execute (image : Image) : Nat → MachineState → OracleComp HashSpec Execution
+  | 0, state => pure ⟨.unfinished, state, 0, 0⟩
+  | steps + 1, state =>
     match fetch image state with
     | none => pure ⟨.failure, state, 0, 0⟩
     | some (.base .ECALL) =>
       if state.getReg .x5 = 0 && hashArgumentsValid state then do
         let input := hashInput state
         let answer ← HashSpec.query input
-        let result ← execute fuel image (writeHash state answer)
+        let result ← execute image steps (writeHash state answer)
         return result.charge (8 * input.blocks) input.blocks
       else if state.getReg .x5 = 1 then
         pure ⟨if state.getReg .x10 = 0 then .success else .failure, state, 1, 0⟩
@@ -231,7 +228,6 @@ def execute : Nat → Image → MachineState → OracleComp HashSpec Execution
     | some instruction =>
       match ordinaryStep state instruction with
       | none => pure ⟨.failure, state, 1, 0⟩
-      | some next => (fun result => result.charge (instructionCycles instruction) 0) <$>
-          execute fuel image next
+      | some next => (·.charge (instructionCycles instruction) 0) <$> execute image steps next
 
 end SigGolf.Riscv

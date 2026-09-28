@@ -118,7 +118,7 @@ theorem certificate : SigGolf.Certificate submission 5000000 := …
 end SigGolf.Challenge
 ```
 
-Images are `SigGolf.Riscv.Image` values: a list of 32-bit instruction words and a list of data bytes. Write them as literals or generate them in Lean; the proof must be about the exact term.
+Images are `SigGolf.Riscv.Image` values: a list of 32-bit instruction words and a list of data bytes. Write them as literals or generate them in Lean; the proof must be about the exact term. `Admission` is decidable; for a full-size image prove it with `by decide +kernel`, since plain `decide` exceeds the elaborator's recursion limit.
 
 Policy, enforced before any Lean runs: at most 1000 entries, 8 MiB per file, 16 MiB total; no symlinks; module names are ASCII identifiers; no `prelude` or `module` headers; imports only from `SigGolf` and its six modules, your own `SigGolfCandidate.*` modules, and `Mathlib`, `ToMathlib`, `VCVio`, `RiscvZkvm`, `Batteries`, `Lean`, `Init`, `Std`.
 
