@@ -76,24 +76,22 @@ def readOutput (sizes : Sizes) (layout : Layout) :
   | .expand, state => readBuffer state layout.witness sizes.witness
   | .verify, _ => ()
 
-/-- One execution: its output if it halted successfully, whether it halted within `CYCLE_LIMIT` instructions, and its cycle and hash counts. -/
+/-- One execution: its output if it halted successfully, whether it halted within `CYCLE_LIMIT` instructions, and its cycles and compressions. -/
 structure RunResult (α : Type) where
   value : Option α
   finished : Bool
   cycles : Nat
-  hashCalls : Nat
-  hashCompressions : Nat
+  compressions : Nat
 
 /-- Run one program on fresh memory, observing at most `CYCLE_LIMIT` instructions. A run cut off there reports `finished = false` and never counts as terminating. -/
 def Submission.run (submission : Submission) (phase : Phase) (input : Input submission.sizes phase) :
     OracleComp HashSpec (RunResult (Output submission.sizes phase)) := do
   match initialState submission phase input with
-  | none => return ⟨none, true, 0, 0, 0⟩ -- inadmissible image; excluded by `Admission`
+  | none => return ⟨none, true, 0, 0⟩ -- inadmissible image; excluded by `Admission`
   | some state =>
     let execution ← Riscv.execute CYCLE_LIMIT (submission.image phase) state
     return ⟨if execution.exit = .success then some (readOutput submission.sizes submission.layout phase execution.state)
-      else none, execution.exit != .unfinished, execution.cycles, execution.hashCalls,
-      execution.hashCompressions⟩
+      else none, execution.exit != .unfinished, execution.cycles, execution.compressions⟩
 
 /-- Fixed-oracle meaning, used in termination and verification-cycle claims. -/
 def Submission.runWith (submission : Submission) (hash : Hash) (phase : Phase)
@@ -115,16 +113,16 @@ def Submission.honest (submission : Submission) (secretKey : SecretKey) (message
     OracleComp HashSpec HonestResult := do
   let mut costs : Phase → Nat := fun _ => 0
   let keygen ← submission.run .keygen secretKey
-  costs := recordCost costs .keygen keygen.hashCompressions
+  costs := recordCost costs .keygen keygen.compressions
   let some (pk, cache) := keygen.value | return ⟨false, costs, 0⟩
   let sign ← submission.run .sign (secretKey, cache, message)
-  costs := recordCost costs .sign sign.hashCompressions
+  costs := recordCost costs .sign sign.compressions
   let some signature := sign.value | return ⟨false, costs, 0⟩
   let expand ← submission.run .expand (message, pk, signature)
-  costs := recordCost costs .expand expand.hashCompressions
+  costs := recordCost costs .expand expand.compressions
   let some witness := expand.value | return ⟨false, costs, 0⟩
   let verify ← submission.run .verify (message, pk, witness)
-  costs := recordCost costs .verify verify.hashCompressions
+  costs := recordCost costs .verify verify.compressions
   return ⟨verify.value.isSome, costs, verify.cycles + witnessCycles submission.sizes.witness⟩
 
 /-- The honest pipeline under one fixed oracle, used in the verification-cycle claim. -/

@@ -202,40 +202,36 @@ inductive Exit where
   | success | failure | unfinished
   deriving DecidableEq, Repr
 
-/-- A finished or cut-off run with its final state and charges. -/
+/-- A finished or cut-off run with its final state, cycles, and compressions. Hash calls are not counted here; the security experiment counts them at the oracle. -/
 structure Execution where
   exit : Exit
   state : MachineState
   cycles : Nat := 0
-  hashCalls : Nat := 0
-  hashCompressions : Nat := 0
+  compressions : Nat := 0
 
-/-- Add one instruction's cycles, hash calls, and compressions. -/
-def Execution.charge (result : Execution) (cycles hashes blocks : Nat) : Execution :=
-  { result with
-    cycles := cycles + result.cycles
-    hashCalls := hashes + result.hashCalls
-    hashCompressions := blocks + result.hashCompressions }
+/-- Add one instruction's cycles and compressions. -/
+def Execution.charge (result : Execution) (cycles blocks : Nat) : Execution :=
+  { result with cycles := cycles + result.cycles, compressions := blocks + result.compressions }
 
 /-- Fuel is a logical observation depth, not a VM timeout. Certification must exclude `unfinished` for every fixed oracle. -/
 def execute : Nat → Image → MachineState → OracleComp HashSpec Execution
-  | 0, _, state => pure ⟨.unfinished, state, 0, 0, 0⟩
+  | 0, _, state => pure ⟨.unfinished, state, 0, 0⟩
   | fuel + 1, image, state =>
     match fetch image state with
-    | none => pure ⟨.failure, state, 0, 0, 0⟩
+    | none => pure ⟨.failure, state, 0, 0⟩
     | some (.base .ECALL) =>
       if state.getReg .x5 = 0 && hashArgumentsValid state then do
         let input := hashInput state
         let answer ← HashSpec.query input
         let result ← execute fuel image (writeHash state answer)
-        return result.charge (8 * input.blocks) 1 input.blocks
+        return result.charge (8 * input.blocks) input.blocks
       else if state.getReg .x5 = 1 then
-        pure ⟨if state.getReg .x10 = 0 then .success else .failure, state, 1, 0, 0⟩
-      else pure ⟨.failure, state, 1, 0, 0⟩
+        pure ⟨if state.getReg .x10 = 0 then .success else .failure, state, 1, 0⟩
+      else pure ⟨.failure, state, 1, 0⟩
     | some instruction =>
       match ordinaryStep state instruction with
-      | none => pure ⟨.failure, state, 1, 0, 0⟩
-      | some next => (fun result => result.charge (instructionCycles instruction) 0 0) <$>
+      | none => pure ⟨.failure, state, 1, 0⟩
+      | some next => (fun result => result.charge (instructionCycles instruction) 0) <$>
           execute fuel image next
 
 end SigGolf.Riscv

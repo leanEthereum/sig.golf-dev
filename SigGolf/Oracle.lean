@@ -1,5 +1,6 @@
 import SigGolf.Parameters
 import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
+import VCVio.OracleComp.QueryTracking.WriterCost
 import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.EvalDist.BitVec
 
@@ -36,10 +37,10 @@ abbrev World := unifSpec + HashSpec
 noncomputable def withRandomOracle {α : Type} (program : OracleComp HashSpec α) : ProbComp α :=
   (simulateQ (randomOracle : QueryImpl HashSpec (StateT (QueryCache HashSpec) ProbComp)) program).run' ∅
 
-/-- Private coins and the secret key sampler do not replace or reset the shared oracle. -/
-noncomputable def withRandomness {α : Type} (program : OracleComp World α) : ProbComp α :=
-  (simulateQ (unifFwdImpl HashSpec +
-    (randomOracle : QueryImpl HashSpec (StateT (QueryCache HashSpec) ProbComp))) program).run' ∅
+/-- The security experiment's shared oracles: private coins forwarded for free, and the same lazy random oracle, where every hash call, cache hits included, costs one. -/
+noncomputable def countedOracle :=
+  (unifFwdImpl HashSpec + (randomOracle : QueryImpl HashSpec (StateT (QueryCache HashSpec) ProbComp))).withAddCost
+    (fun | .inl _ => (0 : Nat) | .inr _ => 1)
 
 /-- A uniform 32-byte secret key. -/
 noncomputable def sampleSecretKey : ProbComp SecretKey := $ᵗ SecretKey

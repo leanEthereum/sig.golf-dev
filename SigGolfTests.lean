@@ -1,7 +1,7 @@
 import SigGolf
 
 namespace SigGolf.Tests
-open OracleComp Riscv RiscvZkvm.Rv64
+open OracleComp OracleSpec Riscv RiscvZkvm.Rv64
 
 private def blank : MachineState := { regs := fun _ => 0, mem := fun _ => 0, pc := 0x1000 }
 private def zeroHash : Hash := fun _ => 0
@@ -44,15 +44,19 @@ example : ¬ (hashImage 128).Valid ⟨1, 1, 2 ^ 17⟩
 example : ¬ ({ hashImage 128 with data := List.replicate 32 0 } : Image).Valid ⟨1, 1, 2 ^ 17⟩
     { standardLayout ⟨1, 1, 2 ^ 17⟩ with witness := MEMORY_BYTES - 16 } := by decide
 
+/-- Coins answer zero and every hash answers zero. -/
 private def fixedWorld : QueryImpl World Id
   | .inl n => ⟨0, Nat.zero_lt_succ n⟩
   | .inr _ => (0 : BitVec 256)
 
-private def hashQuery (input : Query) : OracleComp (AttackSpec toy.sizes) (BitVec 256) :=
-  liftM (OracleSpec.query (spec := AttackSpec toy.sizes) (.inl (.inr input)))
+/-- The fixed world with one unit charged per hash call, as the experiment charges. -/
+private def fixedCounted := fixedWorld.withAddCost (fun | .inl _ => (0 : Nat) | .inr _ => 1)
+
+private def hashQuery (input : Query) : OracleComp (World + SigningSpec toy.sizes) (BitVec 256) :=
+  liftM (OracleSpec.query (spec := World + SigningSpec toy.sizes) (.inl (.inr input)))
 private def signQuery (request : SigningRequest toy.sizes) :
-    OracleComp (AttackSpec toy.sizes) (Option (Bytes toy.sizes.signature)) :=
-  liftM (OracleSpec.query (spec := AttackSpec toy.sizes) (.inr request))
+    OracleComp (World + SigningSpec toy.sizes) (Option (Bytes toy.sizes.signature)) :=
+  liftM (OracleSpec.query (spec := World + SigningSpec toy.sizes) (.inr request))
 
 /-- Two hash queries, then a witness for message 8. -/
 private def repeatHasher : Adversary toy.sizes := fun _ _ => do
@@ -60,10 +64,10 @@ private def repeatHasher : Adversary toy.sizes := fun _ _ => do
   let _ ← hashQuery ⟨0, 0⟩
   return some (.witness 8 0)
 
-/-- One signing request, then a witness for message 8. -/
-private def signer : Adversary toy.sizes := fun _ _ => do
+/-- One signing request for message 7, then the given submission. -/
+private def signer (final : Forgery toy.sizes) : Adversary toy.sizes := fun _ _ => do
   let _ ← signQuery ⟨7, 0⟩
-  return some (.witness 8 0)
+  return some final
 
 /-- Gives up without submitting. -/
 private def quitter : Adversary toy.sizes := fun _ _ => return none
@@ -84,6 +88,18 @@ private def failedSign : Submission where
     | .sign => ⟨(hashImage 128).code.take 4 ++ [addi 5 0 1, addi 10 0 1, 0x73], []⟩
     | phase => cacheEcho.image phase
 
+/-- Run an adversary against a submission's signing oracle in the fixed world, counting hash calls. -/
+private def interact (submission : Submission) (adversary : Adversary submission.sizes) :
+    (Option (Forgery submission.sizes) × QueryLog (SigningSpec submission.sizes)) × Nat :=
+  Id.run (simulateQ fixedCounted ((simulateQ
+    (QueryImpl.ofLift World (WriterT (QueryLog (SigningSpec submission.sizes)) (OracleComp World)) +
+      submission.signingOracle 0) (adversary 0 0)).run)).run
+
+/-- Judge a submission in the fixed world, counting hash calls. -/
+private def judge (submission : Submission) (log : QueryLog (SigningSpec submission.sizes))
+    (forgery : Forgery submission.sizes) : Bool × Nat :=
+  Id.run (simulateQ fixedCounted (liftM (submission.checkForgery 0 log forgery) : OracleComp World Bool)).run
+
 private def check (label : String) (condition : Bool) : IO Unit :=
   unless condition do throw (IO.userError label)
 
@@ -94,13 +110,13 @@ private def check (label : String) (condition : Bool) : IO Unit :=
   let one := runSmall (hashImage 64)
   let two := runSmall (hashImage 128)
   check "HASH has no extra ECALL charge" (one.cycles == 14 && two.cycles == 22)
+  check "HASH is charged per block" (one.compressions == 1 && two.compressions == 2)
   let partialBlock := runSmall (hashImage 72)
-  check "HASH rejects partial blocks" (partialBlock.exit == Exit.failure && partialBlock.hashCalls == 0)
+  check "HASH rejects partial blocks" (partialBlock.exit == Exit.failure && partialBlock.compressions == 0)
   check "multiplication and division cost four cycles"
     ((runSmall ⟨[0x020000b3, 0x020040b3, 0x020070bb, 0x000000b3, addi 5 0 1, 0x73], []⟩).cycles == 15)
-  check "hash calls differ from compressions" (two.hashCalls == 1 && two.hashCompressions == 2)
   let emptyHash := runSmall (hashImage 0)
-  check "HASH rejects empty input" (emptyHash.exit == Exit.failure && emptyHash.hashCalls == 0)
+  check "HASH rejects empty input" (emptyHash.exit == Exit.failure && emptyHash.compressions == 0)
   let looping := runSmall ⟨[0x0000006f], []⟩
   check "observation exhaustion is not termination" (looping.exit == Exit.unfinished && looping.cycles == 20)
   check "malformed ECALL encoding fails" (decodeInstruction 0x000000f3 |>.isNone)
@@ -129,38 +145,40 @@ private def check (label : String) (condition : Bool) : IO Unit :=
   check "HASH rejects input crossing memory end"
     (!hashArgumentsValid (state.setReg .x10 0xffffc8))
   let faulty := runSmall ⟨[0x73], []⟩ (state.setReg .x12 0xfffff8)
-  check "invalid HASH makes no oracle call" (faulty.exit == Exit.failure && faulty.hashCalls == 0)
+  check "invalid HASH makes no oracle call" (faulty.exit == Exit.failure && faulty.compressions == 0)
   check "load at address zero is valid" (memoryArgumentsValid blank (.LD .x1 .x0 0))
   check "load alignment is enforced" (!memoryArgumentsValid blank (.LD .x1 .x0 1))
-  let transcript : Transcript toy.sizes := { signed := [(7, 9)], signingRequests := 1, hashCalls := 11 }
-  let failed := transcript.record 8 ⟨none, true, 4, 2, 3⟩
-  check "failed signing consumes a slot and hash calls"
-    (failed.signingRequests == 2 && failed.hashCalls == 13 && failed.signed == [(7, 9)])
-  check "witness replays excluded by message" (!transcript.freshMessage 7 && transcript.freshMessage 8)
+  -- The signing log and its freshness predicates.
+  let log : QueryLog (SigningSpec toy.sizes) := [⟨⟨7, 0⟩, some 9⟩, ⟨⟨5, 0⟩, none⟩]
+  check "a log within the lifetime is valid" (decide (SigningLog.Valid log))
+  check "witness replays excluded by message" (decide (SigningLog.Signed log 7) && !decide (SigningLog.Signed log 8))
+  check "failed signing adds no replay entry" (!decide (SigningLog.Signed log 5))
   check "signature replays excluded by exact pair"
-    (!transcript.freshSignature 7 9 && transcript.freshSignature 7 10)
-  let witness := evalWithAnswerFn zeroHash (toy.checkForgery 0 transcript (.witness 8 0))
-  let signature := evalWithAnswerFn zeroHash (toy.checkForgery 0 transcript (.signature 7 10))
-  check "witness final check charged" (witness.won && witness.hashCalls == 12)
-  check "expansion and final verification charged" (signature.won && signature.hashCalls == 13)
-  let replay := evalWithAnswerFn zeroHash (toy.checkForgery 0 transcript (.signature 7 9))
-  check "signature replay loses despite acceptance" (!replay.won && replay.hashCalls == 13)
-  let wrongMessage := evalWithAnswerFn zeroHash (toy.checkForgery 0 transcript (.witness 7 0))
-  check "signed-message witness loses despite acceptance" (!wrongMessage.won)
-  let play (adversary : Adversary toy.sizes) (transcript : Transcript toy.sizes) :=
-    evalWithAnswerFn fixedWorld ((simulateQ (toy.oracles 0) (adversary 0 0)).run.run transcript)
-  let (outcome, repeated) := play repeatHasher transcript
-  let submitted := match outcome with | some (some (.witness 8 _)) => true | _ => false
-  check "repeated attacker queries still charged" (submitted && repeated.hashCalls == 13)
-  let (quit, unchanged) := play quitter transcript
-  let gaveUp := match quit with | some none => true | _ => false
-  check "giving up submits nothing and costs nothing" (gaveUp && unchanged.hashCalls == 11)
-  let (signedOnce, afterSign) := play signer transcript
-  check "signing is recorded and charged"
-    (signedOnce.isSome && afterSign.signingRequests == 2 && afterSign.hashCalls == 12 && afterSign.signed == [(7, 0), (7, 9)])
-  let (exhausted, atLimit) := play signer { transcript with signingRequests := LIFETIME }
-  check "signing lifetime ends the experiment before execution"
-    (exhausted.isNone && atLimit.hashCalls == 11 && atLimit.signingRequests == LIFETIME)
+    (decide (SigningLog.Contains log 7 9) && !decide (SigningLog.Contains log 7 10))
+  -- The final check, counting its own hash calls.
+  check "witness final check charged" (judge toy log (.witness 8 0) == (true, 1))
+  check "expansion and final verification charged" (judge toy log (.signature 7 10) == (true, 2))
+  check "signature replay loses despite acceptance" (judge toy log (.signature 7 9) == (false, 2))
+  check "signed-message witness loses despite acceptance" (judge toy log (.witness 7 0) == (false, 1))
+  -- The adversary's oracles, counting its hash calls and logging its signing requests.
+  let ((outcome, played), calls) := interact toy repeatHasher
+  let submitted := match outcome with | some (.witness 8 _) => true | _ => false
+  check "attacker hash queries are charged and nothing is logged" (submitted && calls == 2 && played.isEmpty)
+  let ((quit, _), quitCalls) := interact toy quitter
+  check "giving up submits nothing and costs nothing" (quit.isNone && quitCalls == 0)
+  let ((_, signed), signCalls) := interact toy (signer (.witness 8 0))
+  let loggedSeven := match signed with | [entry] => entry.1.message == 7 && entry.2 == some 0 | _ => false
+  check "signing is logged and its work is charged" (signCalls == 1 && loggedSeven)
+  let ((_, echoed), _) := interact cacheEcho (signer (.witness 8 0))
+  let ((_, echoedCache), _) := interact cacheEcho (fun _ _ => do
+    let _ ← liftM (OracleSpec.query (spec := World + SigningSpec cacheEcho.sizes) (.inr ⟨7, 0xa5⟩))
+    return none)
+  let echoedByte := match echoedCache with | [entry] => entry.2 == some (0xa5 : BitVec 8) | _ => false
+  check "attacker cache reaches sign" (echoed.length == 1 && echoedByte)
+  let ((_, denied), deniedCalls) := interact failedSign (signer (.witness 8 0))
+  let loggedFailure := match denied with | [entry] => entry.2.isNone | _ => false
+  check "failed signing is logged as a failure and retains its cost" (deniedCalls == 1 && loggedFailure)
+  -- Loading and outputs.
   let initialized := initialState toy .verify (0x34, 0x56, 0x78)
   match initialized with
   | none => throw (IO.userError "admissible image rejected by loader")
@@ -184,12 +202,6 @@ private def check (label : String) (condition : Bool) : IO Unit :=
   let outputState := blank.writeBytesAsWords (BitVec.ofNat 64 movedLayout.signature) [0x5a]
   let output : BitVec 8 := readOutput movedToy.sizes movedToy.layout .sign outputState
   check "custom output offset" (output == 0x5a)
-  let signed := evalWithAnswerFn zeroHash (cacheEcho.signingOracle 0 ⟨7, 0xa5⟩)
-  check "attacker cache reaches sign" (signed.value == some (0xa5 : BitVec 8) && signed.finished)
-  check "all signing work is charged" (signed.hashCalls == 1 && signed.hashCompressions == 2)
-  let denied := evalWithAnswerFn zeroHash (failedSign.signingOracle 0 ⟨7, 0xa5⟩)
-  check "failed signing retains its cost"
-    (denied.value.isNone && denied.finished && denied.hashCalls == 1 && denied.hashCompressions == 2)
   IO.println "RISC-V and security regressions passed."
 
 /-- info: 'SigGolf.Certificate' depends on axioms: [propext, Classical.choice, Quot.sound] -/
