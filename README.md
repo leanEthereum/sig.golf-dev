@@ -105,14 +105,14 @@ Stop at the first failure. We say the `experiment succeeds` when all stages succ
 
 `N_P` counts program P's compressions; it is zero if P is never reached. `BUDGET_P` denotes P's named budget.
 
-1. **Completeness:** for every secret key, `Pr_H[experiment succeeds for every message] >= 1 - FAILURE`.
-2. **Compression budgets:** for every secret key and P in {`keygen`, `sign`, `expand`}, `E_{H,M}[2^(N_P / BUDGET_P)] <= 2`.
+1. **Completeness** ([Lean statement](SigGolf/Statements.lean#L21-L24)): for every secret key, `Pr_H[experiment succeeds for every message] >= 1 - FAILURE`.
+2. **Compression budgets** ([Lean statement](SigGolf/Statements.lean#L26-L31)): for every secret key and P in {`keygen`, `sign`, `expand`}, `E_{H,M}[2^(N_P / BUDGET_P)] <= 2`.
 
 `Pr_H` is over H; `E_{H,M}` is over an independently sampled random oracle H and uniform 32-byte message M.
 
 **Remark.** After H is fixed, adaptively chosen messages may cost much more than this average. Any scheme can rule this out by signing the message hashed with a salt derived from the secret key and the message, and carried in the signature. This costs only 16 signature bytes and one hash, so we prefer to rely on this heuristic rather than complicating the rules.
 
-3. **Verification cycles:** for every secret key, message and oracle, if the experiment succeeds, [`verify`](#verify)'s cycles plus the witness charge `⌈W / 256⌉` are at most [`C`](#submission).
+3. **Verification cycles** ([Lean statement](SigGolf/Statements.lean#L33-L38)): for every secret key, message and oracle, if the experiment succeeds, [`verify`](#verify)'s cycles plus the witness charge `⌈W / 256⌉` are at most [`C`](#submission).
 
 ### Security
 
@@ -129,11 +129,11 @@ Consider the following experiment for a classical probabilistic adversary `A` wi
 
 The total hash-call count includes key generation, signing, `A`’s queries, and final expansion and verification when performed.
 
-**Security:** for every A and `Q >= 1`, `Pr[A wins] <= Q / 2^SECURITY_BITS`, over the secret key, H, and `A`’s private randomness.
+**Security** ([Lean statement](SigGolf/Statements.lean#L40-L45)): for every A and `Q >= 1`, `Pr[A wins] <= Q / 2^SECURITY_BITS`, over the secret key, H, and `A`’s private randomness.
 
 ### Termination
 
-**Termination:** every program terminates with a result or failure in fewer than `CYCLE_LIMIT` cycles, for every input and oracle.
+**Termination** ([Lean statement](SigGolf/Statements.lean#L47-L51)): every program terminates with a result or failure in fewer than `CYCLE_LIMIT` cycles, for every input and oracle.
 
 ## RISC-V interface
 
@@ -182,6 +182,6 @@ HASH writes H's 32-byte answer at the output address.
 
 ## Lean project
 
-`SigGolf.Certificate submission C` in [SigGolf/Statements.lean](SigGolf/Statements.lean) is the competition claim for the exact four program images and declared sizes. [SigGolf/Security.lean](SigGolf/Security.lean) defines the attacker and both forgery experiments; [SigGolf/Riscv.lean](SigGolf/Riscv.lean) defines execution and costs. In Lean, the adversary is an `OracleComp` over coins, H, and the signing oracle: a computation that makes finitely many queries and then submits a forgery or gives up. A strategy that could run for ever is represented by its truncations, which give up where they are cut. Giving up never wins, and such a strategy's win probability is the limit of its truncations', so the bound over all adversaries bounds every adaptive strategy.
+[`SigGolf.Certificate submission C`](SigGolf/Statements.lean#L53-L60) in [SigGolf/Statements.lean](SigGolf/Statements.lean) is the competition claim for the exact four program images and declared sizes. Besides the five statements above, it contains [`Admission`](SigGolf/Statements.lean#L12-L16): the size maxima, the program size limit, and the buffer layout rules. [SigGolf/Security.lean](SigGolf/Security.lean) defines the attacker and both forgery experiments; [SigGolf/Riscv.lean](SigGolf/Riscv.lean) defines execution and costs. In Lean, the adversary is an `OracleComp` over coins, H, and the signing oracle: a computation that makes finitely many queries and then submits a forgery or gives up. A strategy that could run for ever is represented by its truncations, which give up where they are cut. Giving up never wins, and such a strategy's win probability is the limit of its truncations', so the bound over all adversaries bounds every adaptive strategy.
 
 Build the statements and regression checks with `lake build SigGolf SigGolfTests`. Dependencies are pinned in `lake-manifest.json`. These files define the requirements; they do not certify a particular signature scheme. Submissions are verified from the [sig.golf-submissions](https://github.com/leanEthereum/sig.golf-submissions) repository.

@@ -36,6 +36,7 @@
 .claim-list b:before, #proofs .callout b:before { content: counter(claim,decimal-leading-zero) ' / '; margin-right: 4px; color: var(--blue); font-size: 11px; }
 #proofs .callout { counter-increment: claim; }
 .claim-list span, #proofs .callout span { color: #334f6d; font-size: 13px; }
+.lean-ref { display: block; width: fit-content; margin-top: 4px; font-size: 12px; font-weight: 400; }
 .fine-print { font-size: 12px; }
 .step-list { margin: 10px 0 14px; padding-left: 26px; color: var(--secondary); }
 .step-list li { margin: 6px 0; padding-left: 4px; }
