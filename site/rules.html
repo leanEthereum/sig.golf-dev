@@ -41,6 +41,7 @@
         <a href="#proofs">Required proofs</a>
         <a href="#interface">RISC-V interface</a>
         <a href="#project">Lean project</a>
+        <a href="#limitations">Known limitations</a>
       </nav>
 
       <div class="rules-content">
@@ -230,6 +231,19 @@
           <h2>Lean project</h2>
           <p><a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Statements.lean#L53-L60"><code>SigGolf.Certificate submission C</code></a> in <a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Statements.lean">SigGolf/Statements.lean</a> is the competition claim for the exact four program images and declared sizes. Besides the five statements above, it contains <a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Statements.lean#L12-L16"><code>Admission</code></a>: the size maxima, the program size limit, and the buffer layout rules. <a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Security.lean">SigGolf/Security.lean</a> defines the attacker and both forgery experiments; <a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Riscv.lean">SigGolf/Riscv.lean</a> defines execution and costs. In Lean, the adversary is an <code>OracleComp</code> over coins, <code>H</code>, and the signing oracle: a computation that makes finitely many queries and then submits a forgery or gives up. A strategy that could run for ever is represented by its truncations, which give up where they are cut. Giving up never wins, and such a strategy's win probability is the limit of its truncations', so the bound over all adversaries bounds every adaptive strategy.</p>
           <p>Build the statements and regression checks with <code>lake build SigGolf SigGolfTests</code>. Dependencies are pinned in <code>lake-manifest.json</code>. These files define the requirements; they do not certify a particular signature scheme. Submissions are verified from the <a href="https://github.com/leanEthereum/sig.golf-submissions">sig.golf-submissions</a> repository.</p>
+        </section>
+
+        <section id="limitations" class="rule-section">
+          <h2>Known limitations</h2>
+          <dl class="detail-list">
+            <div><dt>Quantum security</dt><dd>The security game only considers classical adversaries. We will eventually need ≈ 64 bits of security in the quantum random oracle model.</dd></div>
+            <div><dt>MPC for threshold signing</dt><dd>The keygen and signing budgets let reasonably weak devices, such as hardware wallets, sign. Threshold signing runs keygen and sign inside multi-party computation (MPC), where hashing secret data costs far more. MPC precomputation followed by grinding on public values at signing can help.</dd></div>
+            <div><dt>Trading lifetime for faster keygen and signing</dt><dd><a href="https://conduition.io/cryptography/hypertree-pruning/">Hypertree pruning</a> replaces most hypertree leaves with cheap placeholder hashes and grinds the randomizer until each message lands on a kept leaf, which speeds up keygen and signing without changing verification but lowers the safe number of signatures.</dd></div>
+            <div><dt>Choice of hash function</dt><dd>The oracle <a href="#oracle-definition"><code>H</code></a>, with 64-byte input blocks, 32-byte answers, and a cost of one compression per block, fits BLAKE2s, BLAKE3, and the SHA-256 compression function, but not standard SHA-256, nor SHA-3.</dd></div>
+            <div><dt>Choice of ISA and metering</dt><dd>RV64IM, the <a href="#model">cost of each instruction</a>, and details such as <a href="#system-calls">where HASH reads its inputs</a> are one choice among many, and may not match a given zkVM.</dd></div>
+            <div><dt>Delegating hashes of public values</dt><dd>The keygen and signing budgets count every compression in the enclave, but hashes of non-secret values, typically for grinding, could be delegated from the enclave, such as a hardware wallet, to a powerful host, possibly with a SNARK proving correct computation.</dd></div>
+            <div><dt>127 bits of security</dt><dd>Schemes built on 128-bit hash digests, such as SLH-DSA and <a href="https://github.com/leanEthereum/leanVM/releases/download/doc-latest/SPHINCS.pdf">this SPHINCS+ variant</a>, reach 127 bits of security rather than 128: an adversary can, among other things, try to guess second preimages, and this bound is tight.</dd></div>
+          </dl>
         </section>
       </div>
     </div>
