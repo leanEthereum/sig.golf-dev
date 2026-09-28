@@ -16,12 +16,11 @@ open RiscvZkvm.Rv64 RiscvZkvm.Interpreter OracleComp OracleSpec
 
 /-! ### Images -/
 
-/-- A program: 32-bit instruction encodings and the bytes loaded at `dataBase`. -/
+/-- Instruction encodings and the data bytes loaded at `dataBase`. -/
 structure Image where
   code : List (BitVec 32)
   data : List Byte
 
-/-- `4 × instruction count + embedded-data bytes`, bounded by `MAX_PROGRAM_BYTES`. -/
 def Image.byteSize (image : Image) : Nat := 4 * image.code.length + image.data.length
 
 /-- Embedded data sits at the top of memory, 16-byte aligned; `sp` starts here. -/
@@ -39,30 +38,25 @@ def layoutBuffers (layout : Layout) (sizes : Sizes) : List (Nat × Nat) :=
 abbrev DisjointBuffers (left right : Nat × Nat) : Prop :=
   left.2 = 0 ∨ right.2 = 0 ∨ left.1 + left.2 ≤ right.1 ∨ right.1 + right.2 ≤ left.1
 
-/-- Every buffer is 8-byte aligned and ends at or below the embedded data, and no two overlap. -/
 abbrev LayoutValid (layout : Layout) (sizes : Sizes) (image : Image) : Prop :=
   (∀ buffer ∈ layoutBuffers layout sizes,
     buffer.1 % 8 = 0 ∧ buffer.1 + buffer.2 ≤ dataBase image) ∧
   (layoutBuffers layout sizes).Pairwise DisjointBuffers
 
-/-- An image within the size bound whose layout fits below its data. -/
 abbrev Image.Valid (image : Image) (sizes : Sizes) (layout : Layout) : Prop :=
   image.byteSize < MAX_PROGRAM_BYTES ∧ LayoutValid layout sizes image
 
 /-! ### Memory -/
 
-/-- Fresh registers and memory, all zero, with `PC` at the first instruction. -/
 def initialMachine : MachineState := { regs := fun _ => 0, mem := fun _ => 0, pc := 0x1000 }
 
-/-- `bytes` bytes at `address` lie entirely in memory. -/
 def rangeValid (address : BitVec 64) (bytes : Nat) : Bool :=
   decide (address.toNat + bytes ≤ MEMORY_BYTES)
 
-/-- In memory and aligned to the access size. -/
 def accessValid (address : BitVec 64) (bytes : Nat) : Bool :=
   rangeValid address bytes && decide (address.toNat % bytes = 0)
 
-/-- The `n` bytes at `address`, least significant first. -/
+/-- Little-endian read of `n` bytes at `address`. -/
 def readBuffer (state : MachineState) (address n : Nat) : Bytes n :=
   BitVec.ofNat (8 * n)
     (∑ i ∈ Finset.range n, (state.getByte (BitVec.ofNat 64 (address + i))).toNat * 2 ^ (8 * i))
@@ -74,7 +68,6 @@ inductive WordOp where
   | add | sub | sll | srl | sra | mul | div | divu | rem | remu
   deriving DecidableEq
 
-/-- A decoded instruction: one from the upstream model, or a word operation it lacks. -/
 inductive Instruction where
   | base (instruction : Instr)
   | word (op : WordOp) (rd rs1 rs2 : Reg)
@@ -152,15 +145,13 @@ def ordinaryStep (state : MachineState) : Instruction → Option MachineState
       let value := ((state.getReg rs).truncate 32).sshiftRight shift.toNat
       some ((state.setReg rd (value.signExtend 64)).setPC (state.pc + 4))
 
-/-- Multiplication, division, and remainder instructions cost four cycles; every other ordinary
-instruction costs one. `ECALL` is priced in `execute`. -/
+/-- `ECALL` is priced in `execute`. -/
 def instructionCycles : Instruction → Nat
   | .base (.MUL ..) | .base (.MULH ..) | .base (.MULHSU ..) | .base (.MULHU ..)
   | .base (.DIV ..) | .base (.DIVU ..) | .base (.REM ..) | .base (.REMU ..) => 4
   | .word .mul .. | .word .div .. | .word .divu .. | .word .rem .. | .word .remu .. => 4
   | _ => 1
 
-/-- The instruction at `PC`: code starts at `0x1000`, four bytes per instruction. -/
 def fetch (image : Image) (state : MachineState) : Option Instruction :=
   if 0x1000 ≤ state.pc.toNat ∧ state.pc.toNat % 4 = 0 then
     match image.code[(state.pc.toNat - 0x1000) / 4]? with
@@ -170,8 +161,8 @@ def fetch (image : Image) (state : MachineState) : Option Instruction :=
 
 /-! ### HASH -/
 
-/-- HASH reads whole 64-byte blocks: both addresses are 8-byte aligned, the byte length is a
-nonzero multiple of 64, and input and output lie in memory. -/
+/-- `HASH` takes the input address in `a0`, the byte length in `a1`, and the output address in
+`a2`; it reads whole blocks only. -/
 def hashArgumentsValid (state : MachineState) : Bool :=
   let source := state.getReg .x10
   let bytes := (state.getReg .x11).toNat
@@ -179,12 +170,11 @@ def hashArgumentsValid (state : MachineState) : Bool :=
   decide (source.toNat % 8 = 0) && decide (0 < bytes ∧ bytes % 64 = 0) &&
     rangeValid source bytes && decide (destination.toNat % 8 = 0) && rangeValid destination 32
 
-/-- The `a1` bytes at address `a0`, least significant first, as `a1 / 64` blocks. -/
+/-- The input bytes as a `Query` of `a1 / 64` blocks. -/
 def hashInput (state : MachineState) : Query :=
   let n := (state.getReg .x11).toNat / 64 - 1
   ⟨n, readBuffer state (state.getReg .x10).toNat (64 * (n + 1))⟩
 
-/-- Write the 32-byte answer at `a2`, little-endian, and advance `PC`. -/
 def writeHash (state : MachineState) (answer : BitVec 256) : MachineState :=
   (state.writeWords (state.getReg .x12)
     [answer.extractLsb' 0 64, answer.extractLsb' 64 64,
@@ -198,21 +188,18 @@ inductive Exit where
   | success | failure | unfinished
   deriving DecidableEq
 
-/-- A finished or cut-off run with its final state, cycles, and compressions. Hash calls are not
-counted here; the security experiment counts them at the oracle. -/
+/-- Hash calls are not counted here; the security experiment counts them at the oracle. -/
 structure Execution where
   exit : Exit
   state : MachineState
   cycles : Nat
   compressions : Nat
 
-/-- Add one instruction's cycles and compressions. -/
 def Execution.charge (result : Execution) (cycles blocks : Nat) : Execution :=
   { result with cycles := cycles + result.cycles, compressions := blocks + result.compressions }
 
-/-- Run at most `steps` instructions from `state`, answering each HASH by querying `H`. A program
-still running after `steps` instructions is reported `unfinished`; since every step costs at least
-one cycle, `Termination` rules that out within `CYCLE_LIMIT` steps. -/
+/-- A program still running after `steps` instructions is reported `unfinished`; since every step
+costs at least one cycle, `Termination` rules that out within `CYCLE_LIMIT` steps. -/
 def execute (image : Image) : Nat → MachineState → OracleComp HashSpec Execution
   | 0, state => pure { exit := .unfinished, state := state, cycles := 0, compressions := 0 }
   | steps + 1, state =>

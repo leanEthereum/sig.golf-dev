@@ -10,8 +10,6 @@ once for one message and once over every message. -/
 namespace SigGolf
 open OracleComp RiscvZkvm.Rv64
 
-/-- What a submission declares: the sizes `S`, `W`, `K`, one layout, and the image of each
-program. -/
 structure Submission where
   sizes : Sizes
   layout : Layout
@@ -19,14 +17,13 @@ structure Submission where
 
 /-! ### Loading -/
 
-/-- Inputs loaded before each program runs. -/
 def Input (sizes : Sizes) : Program → Type
   | .keygen => SecretKey
   | .sign => SecretKey × Bytes sizes.cache × Message
   | .expand => Message × PublicKey × Bytes sizes.signature
   | .verify => Message × PublicKey × Bytes sizes.witness
 
-/-- Outputs read after a successful run; `verify` only accepts or rejects. -/
+/-- `verify` only accepts or rejects, so it has no output. -/
 def Output (sizes : Sizes) : Program → Type
   | .keygen => PublicKey × Bytes sizes.cache
   | .sign => Bytes sizes.signature
@@ -37,7 +34,6 @@ def Output (sizes : Sizes) : Program → Type
 def bytes {n : Nat} (value : Bytes n) : List Byte :=
   (List.range n).map fun i => value.extractLsb' (8 * i) 8
 
-/-- Where each program's inputs are written. -/
 def inputBuffers (sizes : Sizes) (layout : Layout) :
     (program : Program) → Input sizes program → List (Nat × List Byte)
   | .keygen, secretKey => [(layout.secretKey, bytes secretKey)]
@@ -51,7 +47,7 @@ def inputBuffers (sizes : Sizes) (layout : Layout) :
       [(layout.message, bytes message), (layout.publicKey, bytes pk),
         (layout.witness, bytes witness)]
 
-/-- Fresh memory, the embedded data at `dataBase`, only the declared inputs, and `sp` at
+/-- Memory holds only the embedded data and the declared inputs; `sp`, register `x2`, starts at
 `dataBase`. -/
 def initialState (submission : Submission) (program : Program)
     (input : Input submission.sizes program) : MachineState :=
@@ -62,7 +58,6 @@ def initialState (submission : Submission) (program : Program)
     (fun state (offset, data) => state.writeBytesAsWords (BitVec.ofNat 64 offset) data) withData
   loaded.setReg .x2 dataBase
 
-/-- Where each program's output is read. -/
 def readOutput (sizes : Sizes) (layout : Layout) :
     (program : Program) → MachineState → Output sizes program
   | .keygen, state =>
@@ -73,15 +68,13 @@ def readOutput (sizes : Sizes) (layout : Layout) :
 
 /-! ### One run -/
 
-/-- One execution: its output if it halted successfully, and its cycles and compressions. -/
 structure RunResult (α : Type) where
   output : Option α
   cycles : Nat
   compressions : Nat
 
-/-- Run one program on fresh memory for at most `CYCLE_LIMIT` instructions; a run cut off there
-has no output. An image that fails `Image.Valid` is run as is; the statements below are meant
-together with `Admission`. -/
+/-- An image that fails `Image.Valid` is run as is; the statements are meant together with
+`Admission`. -/
 def Submission.run (submission : Submission) (program : Program)
     (input : Input submission.sizes program) :
     OracleComp HashSpec (RunResult (Output submission.sizes program)) := do
@@ -93,16 +86,13 @@ def Submission.run (submission : Submission) (program : Program)
 
 /-! ### The honest experiment -/
 
-/-- One honest experiment: whether it succeeded, each program's compressions, and the scored
-verification cycles. -/
 structure HonestResult where
   success : Bool
   compressions : Program → Nat
   verificationCycles : Nat
 
-/-- The README's honest experiment, steps 1 to 4. Stop at the first failure; failed programs
-remain charged and unreached ones cost zero. `Function.update charges program n` is `charges`
-with `program` set to `n`. -/
+/-- The README's honest experiment, steps 1 to 4. A failed program remains charged; unreached
+ones cost zero. -/
 def Submission.honest (submission : Submission) (secretKey : SecretKey) (message : Message) :
     OracleComp HashSpec HonestResult := do
   let mut charges : Program → Nat := fun _ => 0
@@ -127,8 +117,8 @@ def Submission.honest (submission : Submission) (secretKey : SecretKey) (message
   return { success := verify.output.isSome, compressions := charges,
            verificationCycles := verify.cycles + witnessCharge submission.sizes.witness }
 
-/-- Runs the honest experiment for each of the 2^256 messages in turn against the same `H` and
-reports whether all succeed. A mathematical definition, not something one can execute. -/
+/-- All 2^256 messages against the same `H`: a mathematical definition, not something one can
+execute. -/
 noncomputable def Submission.everyMessageSucceeds (submission : Submission)
     (secretKey : SecretKey) : OracleComp HashSpec Bool := do
   let mut allSucceeded := true

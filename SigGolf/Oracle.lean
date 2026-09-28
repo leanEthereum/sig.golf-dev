@@ -16,9 +16,7 @@ the monad `m`; for `m = Id` it is just a function from queries to answers. `simu
 runs `c` with every query answered by `impl`, and `evalWithAnswerFn f c` does so for a plain
 function `f`. `liftM` embeds a computation over fewer oracles into one over more. Two notations:
 `$ᵗ T` draws a uniform element of `T`; `Pr[p | c]` is the probability that `c` returns a
-value satisfying `p`, and `Pr[= x | c]` that it returns exactly `x`. Plain Lean, too: `decide p`
-is the Boolean value of the proposition `p`, and inside a `do` block `let some x := e | fallback`
-continues with `x` when `e` is `some x` and otherwise returns `fallback`. -/
+value satisfying `p`, and `Pr[= x | c]` that it returns exactly `x`. -/
 
 namespace SigGolf
 open OracleComp OracleSpec
@@ -28,10 +26,9 @@ blocks, the README's `k`, so the empty input is unrepresentable. The length is p
 there is no implicit domain separation. -/
 abbrev Query := (n : Nat) × Bytes (64 * (n + 1))
 
-/-- The number of 64-byte blocks in an oracle input, which is also its compression count. -/
+/-- Blocks in an input, each charged as one compression. -/
 def Query.blocks (query : Query) : Nat := query.1 + 1
 
-/-- The hash oracle's signature: block inputs to 32-byte answers. -/
 abbrev HashSpec : OracleSpec Query := Query →ₒ BitVec 256
 
 /-- One particular function `H`, for statements that must hold for every `H`. -/
@@ -40,8 +37,8 @@ abbrev Hash := QueryImpl HashSpec Id
 /-- The security experiment's shared oracles: private coins and the hash. -/
 abbrev World := unifSpec + HashSpec
 
-/-- Run against one lazy random oracle: it keeps the answers given so far, draws a fresh uniform
-answer for a new input, and repeats the stored one otherwise. Starts with nothing stored. -/
+/-- Run against a lazy random oracle: a new input gets a fresh uniform answer, a repeated one
+gets its stored answer. The table starts empty. -/
 def withRandomOracle {α : Type} (program : OracleComp HashSpec α) : ProbComp α :=
   (simulateQ HashSpec.randomOracle program).run' ∅
 

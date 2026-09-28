@@ -39,13 +39,10 @@ def MEMORY_BYTES : Nat := 2 ^ 24
 /-- Bound on `4 × instructions + embedded data bytes` per program. -/
 def MAX_PROGRAM_BYTES : Nat := 2 ^ 20
 
-/-- Largest declarable cache. -/
 def MAX_CACHE_BYTES : Nat := 2 ^ 17
 
-/-- Largest declarable witness. -/
 def MAX_WITNESS_BYTES : Nat := 2 ^ 17
 
-/-- Largest declarable signature. -/
 def MAX_SIGNATURE_BYTES : Nat := 2 ^ 14
 
 /-! ### Objects -/
@@ -58,7 +55,6 @@ abbrev SecretKey := Bytes 32
 abbrev Message := Bytes 32
 abbrev PublicKey := Bytes 16
 
-/-- The four programs of a submission. -/
 inductive Program where
   | keygen | sign | expand | verify
   deriving DecidableEq
@@ -66,14 +62,13 @@ inductive Program where
 instance : Fintype Program :=
   ⟨{.keygen, .sign, .expand, .verify}, fun program => by cases program <;> simp⟩
 
-/-- Compression budgets of `keygen`, `sign`, and `expand`; `verify` has none. -/
 def Program.budget : Program → Option Nat
   | .keygen => some BUDGET_KEYGEN
   | .sign => some BUDGET_SIGN
   | .expand => some BUDGET_EXPAND
   | .verify => none
 
-/-- Submission-chosen object sizes in bytes: signature `S`, witness `W`, and cache `K`. -/
+/-- The README's `S`, `W`, and `K`, in bytes. -/
 structure Sizes where
   signature : Nat
   witness : Nat
@@ -90,7 +85,6 @@ structure Layout where
   witness : Nat
   deriving DecidableEq
 
-/-- Declared sizes within the competition bounds. -/
 abbrev Sizes.Valid (sizes : Sizes) : Prop :=
   sizes.signature ≤ MAX_SIGNATURE_BYTES ∧ sizes.witness ≤ MAX_WITNESS_BYTES ∧
     sizes.cache ≤ MAX_CACHE_BYTES

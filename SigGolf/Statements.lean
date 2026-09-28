@@ -9,8 +9,8 @@ probabilities and expectations live in `ENNReal`, the nonnegative reals with inf
 namespace SigGolf
 open OracleComp OracleComp.EvalDist
 
-/-- **Admission.** Declared sizes within bounds, image-size limits, and 8-byte-aligned,
-nonoverlapping buffers below embedded data. -/
+/-- **Admission.** Sizes within bounds; each image within the size limit, with aligned,
+nonoverlapping buffers below its data. -/
 def Submission.Admission (submission : Submission) : Prop :=
   submission.sizes.Valid ∧
     ∀ program, (submission.image program).Valid submission.sizes submission.layout
@@ -18,45 +18,39 @@ def Submission.Admission (submission : Submission) : Prop :=
 instance (submission : Submission) : Decidable submission.Admission := by
   unfold Submission.Admission; infer_instance
 
-/-- **Completeness** (README 1). One shared oracle makes the experiment succeed for every message,
-except with probability `FAILURE`. The secret key is universally quantified, not averaged. -/
+/-- **Completeness** (README 1). -/
 def Submission.Completeness (submission : Submission) : Prop :=
   ∀ secretKey,
     1 - FAILURE ≤ Pr[= true | withRandomOracle (submission.everyMessageSucceeds secretKey)]
 
-/-- **Compression budgets** (README 2). `E_{H,M}[2^(N_P / BUDGET_P)] ≤ 2` for an independent
-uniform message and random oracle; failed programs are charged, unreached ones cost zero. -/
+/-- **Compression budgets** (README 2): `E_{H,M}[2^(N_P / BUDGET_P)] ≤ 2`. -/
 def Submission.CompressionBudgets (submission : Submission) : Prop :=
   ∀ secretKey program (budget : Nat), program.budget = some budget →
     expectedValue (do let message ← ($ᵗ Message : ProbComp Message)
                       withRandomOracle (submission.honest secretKey message))
       (fun result => (2 : ENNReal) ^ ((result.compressions program : ℝ) / budget)) ≤ 2
 
-/-- **Verification cycles** (README 3). On every successful honest experiment, `verify`'s RISC-V
-cycles plus the witness charge are at most `C`. Arbitrary witnesses remain subject to
-`Termination`. -/
+/-- **Verification cycles** (README 3). Only honest witnesses are bounded here; arbitrary ones fall
+under `Termination`. -/
 def Submission.VerificationCycles (submission : Submission) (C : Nat) : Prop :=
   ∀ (hash : Hash) secretKey message,
     let result := evalWithAnswerFn hash (submission.honest secretKey message)
     result.success = true → result.verificationCycles ≤ C
 
-/-- **Security.** Both forgery forms and every total-call budget, for every adversary: winning
-within `Q` hash calls has probability at most `Q / 2 ^ SECURITY_BITS`. There is no bound on the
-adversary's computation or private randomness. -/
+/-- **Security.** No bound on the adversary's computation or private randomness; only hash calls
+count. -/
 def Submission.Security (submission : Submission) : Prop :=
   ∀ (adversary : Adversary submission.sizes) (Q : Nat), 1 ≤ Q →
     Pr[fun (won, calls) => won = true ∧ calls ≤ Q | submission.securityExperiment adversary]
       ≤ (Q : ENNReal) / 2 ^ SECURITY_BITS
 
-/-- **Termination.** Every program halts in fewer than `CYCLE_LIMIT` cycles on every typed input
-and every fixed oracle, including arbitrary caches, signatures, and witnesses. A run cut off at
+/-- **Termination.** Inputs include arbitrary caches, signatures, and witnesses. A run cut off at
 `CYCLE_LIMIT` instructions has spent at least that many cycles, so it never satisfies this. -/
 def Submission.Termination (submission : Submission) : Prop :=
   ∀ (hash : Hash) (program : Program) (input : Input submission.sizes program),
     (evalWithAnswerFn hash (submission.run program input)).cycles < CYCLE_LIMIT
 
-/-- The competition claim for the exact four images, declared sizes, shared layout, and claimed
-cycle bound `C`. The score is `S × C` for the declared signature size `S`. -/
+/-- The score is `S × C` for the declared signature size `S` and the certified cycle bound `C`. -/
 structure Certificate (submission : Submission) (C : Nat) : Prop where
   admission : submission.Admission
   completeness : submission.Completeness

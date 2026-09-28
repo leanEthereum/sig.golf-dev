@@ -23,20 +23,18 @@ open OracleComp OracleSpec
 
 /-! ### Oracles and adversary -/
 
-/-- A signing query: the message and the cache the attacker chooses to supply. -/
+/-- The cache is the attacker's choice. -/
 structure SigningRequest (sizes : Sizes) where
   message : Message
   cache : Bytes sizes.cache
 
-/-- The signing oracle answers a request with the signature, or `none` if the signer fails. -/
+/-- `none` when the signer fails. -/
 abbrev SigningSpec (sizes : Sizes) : OracleSpec (SigningRequest sizes) :=
   SigningRequest sizes →ₒ Option (Bytes sizes.signature)
 
 /-- The signing oracle's transcript T: each request paired with its answer, failures included. -/
 abbrev SigningLog (sizes : Sizes) := QueryLog (SigningSpec sizes)
 
-/-- The two forgery forms: a witness for a fresh message, or a signature pair the oracle never
-returned. -/
 inductive Forgery (sizes : Sizes) where
   | witness (message : Message) (witness : Bytes sizes.witness)
   | signature (message : Message) (signature : Bytes sizes.signature)
@@ -49,8 +47,7 @@ abbrev Adversary (sizes : Sizes) :=
   PublicKey → Bytes sizes.cache →
     OracleComp (World + SigningSpec sizes) (Option (Forgery sizes))
 
-/-- Sign with the original secret key and the supplied cache, logging each request and its
-answer. All signing work, including any internal search, is charged like any other hash call. -/
+/-- All signing work, including any internal search, is charged like any other hash call. -/
 def Submission.signingOracle (submission : Submission) (secretKey : SecretKey) :
     QueryImpl (SigningSpec submission.sizes)
       (WriterT (SigningLog submission.sizes) (OracleComp World)) :=
@@ -58,8 +55,6 @@ def Submission.signingOracle (submission : Submission) (secretKey : SecretKey) :
     let run ← liftM (submission.run .sign (secretKey, request.cache, request.message))
     return run.output
 
-/-- Let the adversary interact with the shared oracles and the logged signer; returns its final
-answer paired with the signing log T. -/
 def Submission.interact (submission : Submission) (secretKey : SecretKey)
     (adversary : Adversary submission.sizes) (pk : PublicKey)
     (cache : Bytes submission.sizes.cache) :
@@ -120,9 +115,8 @@ def Submission.game (submission : Submission) (adversary : Adversary submission.
   let forged ← liftM (submission.checkForgery pk log forgery)
   return decide log.WithinLifetime && forged
 
-/-- Run from an empty oracle cache. `.run` returns `(won, hash calls)`, the calls covering key
-generation, signing, the adversary's own queries, and the final check; `.run' ∅` starts `H`'s
-answer table empty. -/
+/-- Whether the adversary won, and the hash calls of the whole experiment: key generation,
+signing, the adversary's own queries, and the final check. `H`'s table starts empty. -/
 def Submission.securityExperiment (submission : Submission)
     (adversary : Adversary submission.sizes) : ProbComp (Bool × Nat) :=
   (simulateQ countedOracle (submission.game adversary)).run.run' ∅
