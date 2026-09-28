@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import hashlib
 import json
 import os
 import platform
@@ -29,7 +30,10 @@ HERE = Path(__file__).resolve().parent
 TRUSTED = HERE.parent
 LOG_CAP = 4 * 1024 * 1024
 WALL_SECONDS = 4 * 3600
+EXTRACT_SECONDS = 1800
 MEMORY_BYTES = 24 * 1024**3
+IMAGE_LIMIT = 1 << 20  # SigGolf.MAX_PROGRAM_BYTES
+PROGRAMS = ('keygen', 'sign', 'expand', 'verify')
 
 
 class VerifyError(ValueError):
@@ -113,11 +117,12 @@ def linux_command(cmd: list[str], project: Path, env: dict[str, str], hidden: li
              *[arg for prop in properties for arg in ('-p', prop)], '--', *command], bus_env)
 
 
-def run_checked(cmd: list[str], cwd: Path, env: dict[str, str], log: Path) -> tuple[int, bool]:
+def run_checked(cmd: list[str], cwd: Path, env: dict[str, str], log: Path,
+                seconds: int = WALL_SECONDS) -> tuple[int, bool]:
     """Capture at most 4 MiB; keep draining; kill the process group at the outer deadline."""
     proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             start_new_session=True, bufsize=0)
-    deadline = time.monotonic() + WALL_SECONDS + 120
+    deadline = time.monotonic() + seconds + 120
     truncated = False
     timed_out = False
     try:
@@ -167,6 +172,46 @@ def run_checked(cmd: list[str], cwd: Path, env: dict[str, str], log: Path) -> tu
     return proc.returncode, timed_out
 
 
+def read_images(folder: Path) -> dict[str, dict[str, int | str]]:
+    """Digest the four images the extraction step wrote: a `.code` file of little-endian 32-bit
+    words and a `.data` file of bytes per program. The digest is SHA-256 over the word count as
+    four little-endian bytes, the code, and the data."""
+    images = {}
+    for name in PROGRAMS:
+        code, data = folder / f'{name}.code', folder / f'{name}.data'
+        for file in (code, data):
+            if file.is_symlink() or not file.is_file():
+                raise VerifyError(f'{file.name} was not written')
+            if file.stat().st_size > IMAGE_LIMIT:
+                raise VerifyError(f'{file.name} exceeds the image size limit')
+        code_bytes, data_bytes = code.read_bytes(), data.read_bytes()
+        if len(code_bytes) % 4 or len(code_bytes) + len(data_bytes) >= IMAGE_LIMIT:
+            raise VerifyError(f'{name} image is malformed or oversized')
+        words = len(code_bytes) // 4
+        digest = hashlib.sha256(words.to_bytes(4, 'little') + code_bytes + data_bytes).hexdigest()
+        images[name] = {'code_words': words, 'data_bytes': len(data_bytes), 'sha256': digest}
+    return images
+
+
+def extract_images(args: argparse.Namespace, project: Path, env: dict[str, str], work: Path) -> dict:
+    """Evaluate the verified submission's four images inside the sandbox and digest them."""
+    shutil.copy2(args.trusted / 'verifier' / 'Extract.lean', project / 'Extract.lean')
+    command = ['lake', 'lean', 'Extract.lean']
+    clean_env = {'PATH': f'{Path.home() / ".elan/bin"}:{os.environ.get("PATH", "/usr/bin:/bin")}',
+                 'HOME': str(Path.home()), 'LANG': 'C.UTF-8',
+                 'COMPARATOR_LANDRUN': env['COMPARATOR_LANDRUN'],
+                 'COMPARATOR_LEAN4EXPORT': env['COMPARATOR_LEAN4EXPORT']}
+    if platform.system() == 'Linux':
+        command, clean_env = linux_command(command, project, env, [work / 'source', *args.hide])
+    log = work / 'extract.log'
+    exit_code, timeout = run_checked(command, project, clean_env, log, EXTRACT_SECONDS)
+    if timeout:
+        raise VerifyError('evaluating the images timed out')
+    if exit_code != 0:
+        raise VerifyError('the images could not be evaluated: ' + log.read_text(errors='replace')[-1000:])
+    return read_images(project / '.lake' / 'images')
+
+
 def verify(args: argparse.Namespace) -> dict:
     work = args.work.resolve()
     if work.exists():
@@ -174,7 +219,7 @@ def verify(args: argparse.Namespace) -> dict:
     work.mkdir(parents=True)
     log = work / 'verify.log'
     result = {'status': 'failed', 'commit': args.commit, 'contract_commit': None,
-              'log': str(log), 'claim': None}
+              'log': str(log), 'claim': None, 'images': None}
     try:
         env = tools_env(args.trusted)
         if platform.system() == 'Linux':
@@ -222,6 +267,7 @@ def verify(args: argparse.Namespace) -> dict:
                     stale.unlink()
             for stale in (folder / 'SigGolf').glob('Challenge.*'):
                 stale.unlink()
+        shutil.rmtree(project / '.lake' / 'images', ignore_errors=True)
         command = ['lake', 'env', env['COMPARATOR_BIN'], str(args.trusted / 'verifier' / 'comparator.json')]
         clean_env = {'PATH': f'{Path.home() / ".elan/bin"}:{os.environ.get("PATH", "/usr/bin:/bin")}',
                      'HOME': str(Path.home()), 'LANG': 'C.UTF-8',
@@ -233,6 +279,11 @@ def verify(args: argparse.Namespace) -> dict:
         if timeout:
             result['status'] = 'timeout'
         elif exit_code == 0 and 'Your solution is okay!' in log.read_text(errors='replace'):
+            try:
+                result['images'] = extract_images(args, project, env, work)
+            except VerifyError as exc:
+                result.update(status='rejected', reason=str(exc)[:1200])
+                return result
             result.update(status='verified', score=policy['score'])
         else:
             result.update(status='rejected', reason=log.read_text(errors='replace')[-1200:])

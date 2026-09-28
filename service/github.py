@@ -168,6 +168,13 @@ def _entry(pr: dict, result: dict, contract: str, tree: str) -> dict:
                                      'signature', 'witness'} or
             any(type(offset) is not int or offset < 0 for offset in claim['layout'].values())):
         raise GithubError('invalid verified result identity')
+    images = result.get('images')
+    if (not isinstance(images, dict) or set(images) != {'keygen', 'sign', 'expand', 'verify'} or
+            any(not isinstance(image, dict) or
+                type(image.get('code_words')) is not int or type(image.get('data_bytes')) is not int or
+                not isinstance(image.get('sha256'), str) or not re.fullmatch(r'[0-9a-f]{64}', image['sha256'])
+                for image in images.values())):
+        raise GithubError('verified result lacks the image digests')
     body = pr.get('body') or ''
     match = re.search(r'(?im)^Assisted by:\s*(.{1,80})$', body)
     assistant = match.group(1).strip() if match else None
@@ -179,7 +186,7 @@ def _entry(pr: dict, result: dict, contract: str, tree: str) -> dict:
             'verified_at': datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z'),
             'S': claim['S'], 'W': claim['W'], 'K': claim['K'], 'C': claim['C'],
             'score': str(claim['S'] * claim['C']), 'source_tree': tree,
-            'source_path': f'verified/{commit}'}
+            'source_path': f'verified/{commit}', 'images': images}
 
 
 def publish_verified(api: Github, pr: dict, result: dict, contract: str,

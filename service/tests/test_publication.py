@@ -14,10 +14,15 @@ def pr(number, sha):
             'user': {'login': 'alice'}, 'body': 'Assisted by: Codex', 'title': f'Entry {number}'}
 
 
+IMAGES = {name: {'code_words': 1, 'data_bytes': 0, 'sha256': '0' * 64}
+          for name in ('keygen', 'sign', 'expand', 'verify')}
+
+
 def result(s, c):
     return {'status': 'verified', 'claim': {'S': s, 'W': s, 'K': 1 << 17, 'C': c,
             'layout': {'message': 0, 'secret_key': 32, 'public_key': 64,
-                       'cache': 96, 'signature': 131168, 'witness': 131168 + s}}}
+                       'cache': 96, 'signature': 131168, 'witness': 131168 + s}},
+            'images': IMAGES}
 
 
 class FakeGithub:
@@ -87,6 +92,7 @@ class PublicationTests(unittest.TestCase):
         self.assertTrue(entry['record'])
         self.assertEqual(entry['score'], '20000')
         self.assertEqual(entry['assisted_by'], 'Codex')
+        self.assertEqual(entry['images'], IMAGES)
         again, changed = publish_verified(api, first, result(100, 200), CONTRACT)
         self.assertFalse(changed)
         self.assertEqual(again, entry)
@@ -109,6 +115,14 @@ class PublicationTests(unittest.TestCase):
         entry, _ = publish_verified(api, item, result(100, 200), CONTRACT)
         self.assertTrue(entry['presentation'])
         self.assertEqual(api.updates, 1)
+
+    def test_missing_image_digests_are_not_published(self):
+        api = FakeGithub()
+        first = pr(1, 'b' * 40)
+        api.prs[1] = first
+        incomplete = {**result(100, 200), 'images': None}
+        with self.assertRaises(GithubError):
+            publish_verified(api, first, incomplete, CONTRACT)
 
     def test_changed_pr_head_is_not_published(self):
         api = FakeGithub()
