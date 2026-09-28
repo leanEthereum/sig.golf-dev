@@ -93,7 +93,7 @@ def linux_command(cmd: list[str], project: Path, env: dict[str, str], hidden: li
                   f'CPUAffinity={" ".join(map(str, cpus))}',
                   'KillMode=control-group', 'TimeoutStopSec=5', 'SendSIGKILL=yes', 'TasksMax=512',
                   'RestrictAddressFamilies=~AF_UNIX', 'NoNewPrivileges=yes', 'ProtectSystem=strict',
-                  f'ReadWritePaths={project / ".lake"}', 'PrivatePIDs=yes', 'ProcSubset=pid',
+                  f'ReadWritePaths={project / ".lake"}', 'PrivateTmp=yes', 'PrivatePIDs=yes', 'ProcSubset=pid',
                   'InaccessiblePaths=/sys',
                   'InaccessiblePaths=' + ' '.join(f'-{p}' for p in ['/etc/ots', '/etc/sig-golf', *hidden]),
                   'PrivateDevices=yes', 'TemporaryFileSystem=/dev/shm', 'PrivateIPC=yes',
