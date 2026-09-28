@@ -59,7 +59,7 @@ def initialState (submission : Submission) (program : Program)
   let dataBase := BitVec.ofNat 64 (Riscv.dataBase image)
   let withData := Riscv.initialMachine.writeBytesAsWords dataBase image.data
   let loaded := (inputBuffers submission.sizes submission.layout program input).foldl
-    (fun state buffer => state.writeBytesAsWords (BitVec.ofNat 64 buffer.1) buffer.2) withData
+    (fun state (offset, data) => state.writeBytesAsWords (BitVec.ofNat 64 offset) data) withData
   loaded.setReg .x2 dataBase
 
 /-- Where each program's output is read. -/
@@ -101,33 +101,40 @@ structure HonestResult where
   verificationCycles : Nat
 
 /-- The README's honest experiment, steps 1 to 4. Stop at the first failure; failed programs
-remain charged and unreached ones cost zero. -/
+remain charged and unreached ones cost zero. `Function.update charges program n` is `charges`
+with `program` set to `n`. -/
 def Submission.honest (submission : Submission) (secretKey : SecretKey) (message : Message) :
     OracleComp HashSpec HonestResult := do
-  let mut compressions : Program → Nat := fun _ => 0
+  let mut charges : Program → Nat := fun _ => 0
   -- 1. keygen
   let keygen ← submission.run .keygen secretKey
-  compressions := Function.update compressions .keygen keygen.compressions
-  let some (pk, cache) := keygen.output | return ⟨false, compressions, 0⟩
+  charges := Function.update charges .keygen keygen.compressions
+  let some (pk, cache) := keygen.output
+    | return { success := false, compressions := charges, verificationCycles := 0 }
   -- 2. sign
   let sign ← submission.run .sign (secretKey, cache, message)
-  compressions := Function.update compressions .sign sign.compressions
-  let some signature := sign.output | return ⟨false, compressions, 0⟩
+  charges := Function.update charges .sign sign.compressions
+  let some signature := sign.output
+    | return { success := false, compressions := charges, verificationCycles := 0 }
   -- 3. expand
   let expand ← submission.run .expand (message, pk, signature)
-  compressions := Function.update compressions .expand expand.compressions
-  let some witness := expand.output | return ⟨false, compressions, 0⟩
+  charges := Function.update charges .expand expand.compressions
+  let some witness := expand.output
+    | return { success := false, compressions := charges, verificationCycles := 0 }
   -- 4. verify
   let verify ← submission.run .verify (message, pk, witness)
-  compressions := Function.update compressions .verify verify.compressions
-  return ⟨verify.output.isSome, compressions,
-    verify.cycles + witnessCharge submission.sizes.witness⟩
+  charges := Function.update charges .verify verify.compressions
+  return { success := verify.output.isSome, compressions := charges,
+           verificationCycles := verify.cycles + witnessCharge submission.sizes.witness }
 
 /-- Runs the honest experiment for each of the 2^256 messages in turn against the same `H` and
 reports whether all succeed. A mathematical definition, not something one can execute. -/
 noncomputable def Submission.everyMessageSucceeds (submission : Submission)
-    (secretKey : SecretKey) : OracleComp HashSpec Bool :=
-  (·.all HonestResult.success) <$>
-    (Finset.univ : Finset Message).toList.mapM (submission.honest secretKey)
+    (secretKey : SecretKey) : OracleComp HashSpec Bool := do
+  let mut allSucceeded := true
+  for message in (Finset.univ : Finset Message).toList do
+    let result ← submission.honest secretKey message
+    allSucceeded := allSucceeded && result.success
+  return allSucceeded
 
 end SigGolf

@@ -16,7 +16,9 @@ the monad `m`; for `m = Id` it is just a function from queries to answers. `simu
 runs `c` with every query answered by `impl`, and `evalWithAnswerFn f c` does so for a plain
 function `f`. `liftM` embeds a computation over fewer oracles into one over more. Two notations:
 `$ᵗ T` draws a uniform element of `T`; `Pr[p | c]` is the probability that `c` returns a
-value satisfying `p`, and `Pr[= x | c]` that it returns exactly `x`. -/
+value satisfying `p`, and `Pr[= x | c]` that it returns exactly `x`. Plain Lean, too: `decide p`
+is the Boolean value of the proposition `p`, and inside a `do` block `let some x := e | fallback`
+continues with `x` when `e` is `some x` and otherwise returns `fallback`. -/
 
 namespace SigGolf
 open OracleComp OracleSpec

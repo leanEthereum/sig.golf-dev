@@ -76,7 +76,7 @@ theorem unfinished_cycles (hash : Hash) (image : Image) :
         · simp
     · split
       · simp
-      · simp only [evalWithAnswerFn_map, Execution.charge]
+      · simp only [bind_pure_comp, evalWithAnswerFn_map, Execution.charge]
         intro h
         have := ih _ h
         have hc : 1 ≤ instructionCycles ‹Instruction› := by unfold instructionCycles; split <;> omega

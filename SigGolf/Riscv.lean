@@ -64,8 +64,8 @@ def accessValid (address : BitVec 64) (bytes : Nat) : Bool :=
 
 /-- The `n` bytes at `address`, least significant first. -/
 def readBuffer (state : MachineState) (address n : Nat) : Bytes n :=
-  BitVec.ofNat (8 * n) ((List.range n).foldl
-    (fun acc i => acc + (state.getByte (BitVec.ofNat 64 (address + i))).toNat * 2 ^ (8 * i)) 0)
+  BitVec.ofNat (8 * n)
+    (∑ i ∈ Finset.range n, (state.getByte (BitVec.ofNat 64 (address + i))).toNat * 2 ^ (8 * i))
 
 /-! ### Decoding -/
 
@@ -161,10 +161,12 @@ def instructionCycles : Instruction → Nat
   | _ => 1
 
 /-- The instruction at `PC`: code starts at `0x1000`, four bytes per instruction. -/
-def fetch (image : Image) (state : MachineState) : Option Instruction := do
-  guard (0x1000 ≤ state.pc.toNat ∧ state.pc.toNat % 4 = 0)
-  let word ← image.code[(state.pc.toNat - 0x1000) / 4]?
-  decodeInstruction word
+def fetch (image : Image) (state : MachineState) : Option Instruction :=
+  if 0x1000 ≤ state.pc.toNat ∧ state.pc.toNat % 4 = 0 then
+    match image.code[(state.pc.toNat - 0x1000) / 4]? with
+    | some word => decodeInstruction word
+    | none => none
+  else none
 
 /-! ### HASH -/
 
@@ -212,10 +214,10 @@ def Execution.charge (result : Execution) (cycles blocks : Nat) : Execution :=
 still running after `steps` instructions is reported `unfinished`; since every step costs at least
 one cycle, `Termination` rules that out within `CYCLE_LIMIT` steps. -/
 def execute (image : Image) : Nat → MachineState → OracleComp HashSpec Execution
-  | 0, state => pure ⟨.unfinished, state, 0, 0⟩
+  | 0, state => pure { exit := .unfinished, state := state, cycles := 0, compressions := 0 }
   | steps + 1, state =>
     match fetch image state with
-    | none => pure ⟨.failure, state, 0, 0⟩
+    | none => pure { exit := .failure, state := state, cycles := 0, compressions := 0 }
     | some (.base .ECALL) =>
       if state.getReg .x5 = 0 && hashArgumentsValid state then do
         let input := hashInput state
@@ -223,11 +225,14 @@ def execute (image : Image) : Nat → MachineState → OracleComp HashSpec Execu
         let result ← execute image steps (writeHash state answer)
         return result.charge (8 * input.blocks) input.blocks
       else if state.getReg .x5 = 1 then
-        pure ⟨if state.getReg .x10 = 0 then .success else .failure, state, 1, 0⟩
-      else pure ⟨.failure, state, 1, 0⟩
+        pure { exit := if state.getReg .x10 = 0 then .success else .failure, state := state,
+               cycles := 1, compressions := 0 }
+      else pure { exit := .failure, state := state, cycles := 1, compressions := 0 }
     | some instruction =>
       match ordinaryStep state instruction with
-      | none => pure ⟨.failure, state, 1, 0⟩
-      | some next => (·.charge (instructionCycles instruction) 0) <$> execute image steps next
+      | none => pure { exit := .failure, state := state, cycles := 1, compressions := 0 }
+      | some next => do
+          let result ← execute image steps next
+          return result.charge (instructionCycles instruction) 0
 
 end SigGolf.Riscv

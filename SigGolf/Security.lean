@@ -54,9 +54,9 @@ answer. All signing work, including any internal search, is charged like any oth
 def Submission.signingOracle (submission : Submission) (secretKey : SecretKey) :
     QueryImpl (SigningSpec submission.sizes)
       (WriterT (SigningLog submission.sizes) (OracleComp World)) :=
-  QueryImpl.withLogging fun request =>
-    liftM (RunResult.output <$>
-      submission.run .sign (secretKey, request.cache, request.message) : OracleComp HashSpec _)
+  QueryImpl.withLogging fun request => do
+    let run ← liftM (submission.run .sign (secretKey, request.cache, request.message))
+    return run.output
 
 /-- Let the adversary interact with the shared oracles and the logged signer; returns its final
 answer paired with the signing log T. -/
