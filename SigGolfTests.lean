@@ -48,17 +48,25 @@ private def fixedWorld : QueryImpl World Id
   | .inl n => ⟨0, Nat.zero_lt_succ n⟩
   | .inr _ => (0 : BitVec 256)
 
-private def repeatHasher : Adversary toy.sizes where
-  State := Nat
-  initial := fun _ _ => 0
-  step := fun state => if state < 2 then .hash ⟨0, 0⟩ (fun _ => state + 1)
-    else .submit (.witness 8 0)
+private def hashQuery (input : Query) : OracleComp (AttackSpec toy.sizes) (BitVec 256) :=
+  liftM (OracleSpec.query (spec := AttackSpec toy.sizes) (.inl (.inr input)))
+private def signQuery (request : SigningRequest toy.sizes) :
+    OracleComp (AttackSpec toy.sizes) (Option (Bytes toy.sizes.signature)) :=
+  liftM (OracleSpec.query (spec := AttackSpec toy.sizes) (.inr request))
 
-private def signer : Adversary toy.sizes where
-  State := Bool
-  initial := fun _ _ => false
-  step := fun done => if done then .submit (.witness 8 0)
-    else .sign ⟨7, 0⟩ (fun _ => true)
+/-- Two hash queries, then a witness for message 8. -/
+private def repeatHasher : Adversary toy.sizes := fun _ _ => do
+  let _ ← hashQuery ⟨0, 0⟩
+  let _ ← hashQuery ⟨0, 0⟩
+  return some (.witness 8 0)
+
+/-- One signing request, then a witness for message 8. -/
+private def signer : Adversary toy.sizes := fun _ _ => do
+  let _ ← signQuery ⟨7, 0⟩
+  return some (.witness 8 0)
+
+/-- Gives up without submitting. -/
+private def quitter : Adversary toy.sizes := fun _ _ => return none
 
 private def cacheEcho : Submission where
   sizes := ⟨1, 1, 2 ^ 17⟩
@@ -139,13 +147,20 @@ private def check (label : String) (condition : Bool) : IO Unit :=
   check "signature replay loses despite acceptance" (!replay.won && replay.hashCalls == 13)
   let wrongMessage := evalWithAnswerFn zeroHash (toy.checkForgery 0 transcript (.witness 7 0))
   check "signed-message witness loses despite acceptance" (!wrongMessage.won)
-  let repeated := evalWithAnswerFn fixedWorld (toy.interact repeatHasher 0 0 3 (repeatHasher.initial 0 0) transcript)
-  check "repeated attacker queries still charged" (repeated.won && repeated.hashCalls == 14)
-  let observed :=  evalWithAnswerFn fixedWorld (toy.interact repeatHasher 0 0 2 (repeatHasher.initial 0 0) transcript)
-  check "no win before final submission" (!observed.won && observed.hashCalls == 13)
-  let exhausted := evalWithAnswerFn fixedWorld (toy.interact signer 0 0 3 false
-    { transcript with signingRequests := LIFETIME })
-  check "signing lifetime enforced before execution" (!exhausted.won && exhausted.hashCalls == 11)
+  let play (adversary : Adversary toy.sizes) (transcript : Transcript toy.sizes) :=
+    evalWithAnswerFn fixedWorld ((simulateQ (toy.oracles 0) (adversary 0 0)).run.run transcript)
+  let (outcome, repeated) := play repeatHasher transcript
+  let submitted := match outcome with | some (some (.witness 8 _)) => true | _ => false
+  check "repeated attacker queries still charged" (submitted && repeated.hashCalls == 13)
+  let (quit, unchanged) := play quitter transcript
+  let gaveUp := match quit with | some none => true | _ => false
+  check "giving up submits nothing and costs nothing" (gaveUp && unchanged.hashCalls == 11)
+  let (signedOnce, afterSign) := play signer transcript
+  check "signing is recorded and charged"
+    (signedOnce.isSome && afterSign.signingRequests == 2 && afterSign.hashCalls == 12 && afterSign.signed == [(7, 0), (7, 9)])
+  let (exhausted, atLimit) := play signer { transcript with signingRequests := LIFETIME }
+  check "signing lifetime ends the experiment before execution"
+    (exhausted.isNone && atLimit.hashCalls == 11 && atLimit.signingRequests == LIFETIME)
   let initialized := initialState toy .verify (0x34, 0x56, 0x78)
   match initialized with
   | none => throw (IO.userError "admissible image rejected by loader")
