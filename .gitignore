@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 verifier/.tools
 verifier/.work/
+SigGolf/Images.lean

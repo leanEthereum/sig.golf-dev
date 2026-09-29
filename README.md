@@ -9,6 +9,8 @@ Design a **stateless hash-based signature scheme** minimizing `S × C`: signatur
 3. [Six byte offsets](#inputs-and-outputs) specifying where RISC-V inputs and outputs reside in memory.
 4. Lean 4 proofs of the [required statements](#required-lean-statements) for those exact images, sizes, layout, and bound.
 
+Submit each image as `submission/images/<program>.code` (little-endian 32-bit instruction words) and `submission/images/<program>.data` (raw embedded bytes). All eight files are required; empty files are allowed. The verifier generates `SigGolf.Images` from these bytes and additionally requires `SigGolf.Challenge.images_match : submission.image = SigGolf.Images.images`. This equality is kernel-checked alongside the certificate; candidate evaluation is never used to choose the published images. The verified source snapshot includes the image files. See [the submission guide](site/llms.txt) for the other files and theorem names.
+
 ## Parameters
 
 | Constant          |                 Value |
@@ -110,7 +112,7 @@ Stop at the first failure. We say the `experiment succeeds` when all stages succ
 
 `Pr_H` is over H; `E_{H,M}` is over an independently sampled random oracle H and uniform 32-byte message M.
 
-**Remark.** After H is fixed, adaptively chosen messages may cost much more than this average. Any scheme can rule this out by signing the message hashed with a salt derived from the secret key and the message, and carried in the signature. This costs only 16 signature bytes and one hash, so we prefer to rely on this heuristic rather than complicating the rules.
+**Remark.** After H is fixed, selected messages may cost much more than this average, even if the message is chosen in advance. Hashing a message with a secret-derived salt is a scheme-dependent mitigation, not a proved adaptive cost bound. A deterministic salt repeats on repeated messages. The current rules do not guarantee fast signing for adversarially chosen messages.
 
 3. **Verification cycles** ([Lean statement](SigGolf/Statements.lean#L33-L38)): for every secret key, message and oracle, if the experiment succeeds, [`verify`](#verify)'s cycles plus the witness charge `⌈W / 256⌉` are at most [`C`](#submission).
 
@@ -187,11 +189,17 @@ HASH writes H's 32-byte answer at the output address. Any other `t0` fails.
 
 Build the statements and regression checks with `lake build SigGolf SigGolfTests`. Dependencies are pinned in `lake-manifest.json`. These files define the requirements; they do not certify a particular signature scheme. Submissions are verified from the [sig.golf-submissions](https://github.com/leanEthereum/sig.golf-submissions) repository.
 
+Verification intake admits at most 1000 entries, 8 MiB per file, and 16 MiB total including images; no symlinks or alternate Lean module headers. Proof checking allows 4 hours, 24 GiB, and two CPUs. On Linux, writable build output is limited to 4 GiB and 100,000 inodes; `/tmp` and `/var/tmp` each have 256 MiB and 16,384 inodes, and `/dev/shm` has 64 MiB and 4,096 inodes. These temporary filesystems count toward the memory limit; dependencies are read-only.
+
 ## Known limitations
 
+- **Practical cycle limits (unresolved):** compression budgets do not count ordinary instructions. Keygen, sign, and expand are only subject to the universal `CYCLE_LIMIT`, so these rules do not establish hardware-wallet performance. Separate practical cycle limits and adaptive-message cost guarantees remain organizer decisions; no new limits are imposed here.
+- **Timing and other side channels:** the adversary receives signatures or failure, not execution time, memory accesses, or internal hash traces. A certificate does not establish constant-time execution or side-channel resistance.
+- **Untrusted verification inputs:** `C` bounds successful honest verification. Arbitrary witnesses, including other accepting witnesses, are covered only by `CYCLE_LIMIT`, not by `C`.
+- **Whole-experiment security accounting:** honest hash calls count toward `Q` too. Adding unnecessary honest hashing increases the allowed forgery probability at the resulting budget. The bound is not an attacker-only work estimate.
 - **Quantum security:** the security game only considers classical adversaries. NIST level 1 requires ≈ 64 bits of security against quantum adversaries.
 - **Single-user security:** the security game targets a single key, but a real attacker can target many users at once. The standard defense starts every hash with a per-key public parameter, so work against one user is useless against others. Drake's trick makes this cheap: a 16-byte parameter in the public key, padded with 48 zero bytes, fills the first 64-byte block of every hash, so its hash state is computed once and reused. Multi-user security then costs one compression and 16 bytes of public key.
-- **MPC for threshold signing:** the keygen and signing budgets let reasonably weak devices, such as hardware wallets, sign. Threshold signing runs keygen and sign inside multi-party computation (MPC), where hashing secret data costs far more. MPC precomputation followed by grinding on public values at signing can help (see [RivaLabs](https://github.com/RivaLabs-Core)).
+- **MPC for threshold signing:** threshold signing runs keygen and sign inside multi-party computation (MPC), where hashing secret data costs far more. MPC precomputation followed by grinding on public values at signing can help (see [RivaLabs](https://github.com/RivaLabs-Core)).
 - **Trading lifetime for faster keygen and signing:** [hypertree pruning](https://conduition.io/cryptography/hypertree-pruning/) replaces most hypertree leaves with cheap placeholder hashes and grinds the randomizer until each message lands on a kept leaf, which speeds up keygen and signing without changing verification but lowers the safe number of signatures.
 - **Choice of hash function:** the oracle H takes inputs made of 64-byte blocks, returns 32-byte answers, and costs one compression per block. This cost model is accurate for BLAKE2s, for BLAKE3 on inputs up to 1 KiB, and for the SHA-256 compression function, but less precise for standard SHA-256, whose padding adds a block to every input, and for SHA-3, which absorbs 136 bytes per permutation.
 - **Choice of ISA and metering:** RV64IM, the [cost of each instruction](#risc-v-programs), and details such as [where HASH reads its inputs](#system-calls) are one choice among many, and may not match a given zkVM.

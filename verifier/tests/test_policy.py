@@ -6,6 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from check_submission import check
+from images import IMAGE_FILES, MAX_PROGRAM_BYTES
 
 
 class PolicyTests(unittest.TestCase):
@@ -13,6 +14,9 @@ class PolicyTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         (self.root / 'SigGolfCandidate').mkdir()
+        (self.root / 'images').mkdir()
+        for name in IMAGE_FILES:
+            (self.root / name).write_bytes(b'')
         (self.root / 'Solution.lean').write_text('import SigGolfCandidate.Helper\n')
         (self.root / 'SigGolfCandidate' / 'Helper.lean').write_text('import SigGolf\n')
         self.claim = {'S': 8, 'W': 8, 'K': 1 << 17, 'C': 100,
@@ -36,6 +40,39 @@ class PolicyTests(unittest.TestCase):
         value = check(self.root)
         self.assertFalse(value['ok'])
         self.assertIn('outside the allowed modules', value['errors'][0])
+
+    def test_module_header_cannot_hide_public_imports(self):
+        for header in ('module', 'module -- comment', '\ufeffmodule', '/- comment -/ module'):
+            with self.subTest(header=header):
+                (self.root / 'Solution.lean').write_text(header + '\npublic import Lake\n')
+                value = check(self.root)
+                self.assertFalse(value['ok'])
+                self.assertTrue(any('alternate module headers' in error for error in value['errors']))
+
+    def test_generated_images_import_is_allowed(self):
+        (self.root / 'Solution.lean').write_text('import SigGolf.Images\n')
+        self.assertTrue(check(self.root)['ok'])
+
+    def test_missing_image_is_rejected(self):
+        (self.root / 'images/verify.data').unlink()
+        self.assertFalse(check(self.root)['ok'])
+
+    def test_instruction_alignment_and_combined_image_size(self):
+        code = self.root / 'images/sign.code'
+        data = self.root / 'images/sign.data'
+        code.write_bytes(b'\x73')
+        self.assertFalse(check(self.root)['ok'])
+        code.write_bytes(b'\x73\0\0\0')
+        data.write_bytes(bytes(MAX_PROGRAM_BYTES - 4))
+        self.assertFalse(check(self.root)['ok'])
+        data.write_bytes(bytes(MAX_PROGRAM_BYTES - 5))
+        self.assertTrue(check(self.root)['ok'])
+
+    def test_image_symlink_is_rejected_before_reading(self):
+        image = self.root / 'images/verify.code'
+        image.unlink()
+        image.symlink_to('/dev/zero')
+        self.assertFalse(check(self.root)['ok'])
 
     def test_symlink_and_archive_file_are_rejected(self):
         (self.root / 'SigGolfCandidate' / 'Alias.lean').symlink_to('Helper.lean')

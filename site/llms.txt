@@ -41,6 +41,8 @@ Memory faults, misaligned accesses, invalid HASH arguments, unknown syscalls, EB
 
 Honest budgets, in 64-byte compressions: keygen 2^20, sign 2^17, expand 2^20. Verify has no budget; its cycles are the score.
 
+Practical cycle limits for keygen, sign, and expand remain unresolved: the compression budgets exclude ordinary instructions, and the only universal cycle cap is 2^32. The uniform-message moment bound does not guarantee fast signing on selected or repeated messages. A secret-derived salt is only a scheme-dependent mitigation. The security game does not expose timing or other side channels; C applies only to successful honest verification, not arbitrary witnesses. Q includes honest hashing, so it is not an attacker-only work budget.
+
 ## What the certificate proves
 
 `SigGolf.Certificate submission C` has six fields. In plain terms:
@@ -84,6 +86,8 @@ Open a pull request against branch `beta` of the submissions repository. The ver
 ```
 submission/claim.json           required, at most 512 bytes
 submission/Solution.lean        required
+submission/images/<program>.code required for keygen, sign, expand, verify
+submission/images/<program>.data required for keygen, sign, expand, verify
 submission/SigGolfCandidate/…   optional helper modules, .lean only, any depth
 presentation/presentation.json  optional, shown on the site, never verified
 presentation/scheme.svg         optional, only with "diagram": true
@@ -101,11 +105,14 @@ presentation/scheme.svg         optional, only with "diagram": true
 
 ```lean
 import SigGolf
+import SigGolf.Images
 -- import SigGolfCandidate.YourModules as needed
 
 namespace SigGolf.Challenge
 
-noncomputable def submission : SigGolf.Submission := ⟨sizes, layout, images⟩
+noncomputable def submission : SigGolf.Submission := ⟨sizes, layout, SigGolf.Images.images⟩
+
+theorem images_match : submission.image = SigGolf.Images.images := rfl
 
 theorem signature_bytes : submission.sizes.signature = 7856 := by decide
 theorem witness_bytes : submission.sizes.witness = 7856 := by decide
@@ -118,11 +125,11 @@ theorem certificate : SigGolf.Certificate submission 5000000 := …
 end SigGolf.Challenge
 ```
 
-Images are `SigGolf.Riscv.Image` values: a list of 32-bit instruction words and a list of data bytes. Write them as literals or generate them in Lean; the proof must be about the exact term. `Admission` is decidable; for a full-size image prove it with `by decide +kernel`, since plain `decide` exceeds the elaborator's recursion limit.
+Each `.code` file contains little-endian 32-bit instruction words; each `.data` file contains raw embedded bytes. Empty files are allowed, but all eight files are required. Each code/data pair must total less than 1 MiB. From the dev checkout, run `python3 verifier/images.py /path/to/submission` to generate the local `SigGolf/Images.lean` needed to develop your proof. The verifier regenerates this module itself from the frozen bytes. Import it; do not submit it. You may define images another way if you prove `images_match`. Classical existence without this equality is insufficient, and candidate `#eval` or `implemented_by` cannot select the image bytes. `Admission` is decidable; for a full-size image prove it with `by decide +kernel`, since plain `decide` exceeds the elaborator's recursion limit.
 
-Policy, enforced before any Lean runs: at most 1000 entries, 8 MiB per file, 16 MiB total; no symlinks; module names are ASCII identifiers; no `prelude` or `module` headers; imports only from `SigGolf` and its six modules, your own `SigGolfCandidate.*` modules, and `Mathlib`, `ToMathlib`, `VCVio`, `RiscvZkvm`, `Batteries`, `Lean`, `Init`, `Std`.
+Policy, enforced before any Lean runs: at most 1000 entries, 8 MiB per file, 16 MiB total including image files; no symlinks; module names are ASCII identifiers; no `prelude` or `module` headers; imports only from `SigGolf`, its six contract modules, the generated `SigGolf.Images`, your own `SigGolfCandidate.*` modules, and `Mathlib`, `ToMathlib`, `VCVio`, `RiscvZkvm`, `Batteries`, `Lean`, `Init`, `Std`.
 
-Proof checking, in a sandbox without network: the organizer's challenge is built and exported first, then your solution is built, exported, compared statement by statement against the challenge, and replayed through the Lean kernel. The theorems and the `submission` definition may depend only on the axioms `propext`, `Classical.choice`, and `Quot.sound`: no `sorry`, no `native_decide`. Toolchain `leanprover/lean4:v4.33.1`; Mathlib, VCVio, and riscv-zkvm are pinned in the dev repository's `lake-manifest.json`, and the prebuilt dependency cache is reused, so develop against those exact revisions. Limits: 4 hours wall clock, 24 GiB, two CPUs. A verified PR gets a success status on its commit and an entry in records.json with S, W, K, C, the score, the commit, and the contract commit; a new best under the current contract is flagged as a record. Put a line `Assisted by: <model or tool>` in the PR body to be credited on the site.
+Proof checking, in a sandbox without network: the organizer's challenge is built and exported first, then your solution is built, exported, compared statement by statement against the challenge, and replayed through the Lean kernel. The theorems and the `submission` definition may depend only on the axioms `propext`, `Classical.choice`, and `Quot.sound`: no `sorry`, no `native_decide`. Toolchain `leanprover/lean4:v4.33.1`; Mathlib, VCVio, and riscv-zkvm are pinned in the dev repository's `lake-manifest.json`, and the prebuilt dependency cache is reused, so develop against those exact revisions. Limits: 4 hours wall clock, 24 GiB, two CPUs. On Linux, writable build output uses a 4 GiB tmpfs with 100,000 inodes; /tmp and /var/tmp each have 256 MiB and 16,384 inodes, and /dev/shm has 64 MiB and 4,096 inodes. These filesystems also count toward the memory limit. Dependencies are read-only. A verified PR gets a success status on its commit and an entry in records.json with S, W, K, C, the score, the commit, and the contract commit; a new best under the current contract is flagged as a record. Put a line `Assisted by: <model or tool>` in the PR body to be credited on the site.
 
 ## Presentation, optional
 

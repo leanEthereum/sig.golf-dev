@@ -7,6 +7,8 @@ import json
 import re
 from pathlib import Path
 
+from images import IMAGE_FILES, load_images
+
 MAX_FILES = 1000
 MAX_FILE_BYTES = 8 * 1024 * 1024
 MAX_TOTAL_BYTES = 16 * 1024 * 1024
@@ -17,7 +19,20 @@ CLAIM_KEYS = {"S", "W", "K", "C", "layout"}
 LAYOUT_KEYS = ("message", "secret_key", "public_key", "cache", "signature", "witness")
 ALLOWED_LIBRARIES = ("Mathlib", "ToMathlib", "VCVio", "RiscvZkvm", "Batteries", "Lean", "Init", "Std")
 ALLOWED_CONTRACT = {"SigGolf", "SigGolf.Parameters", "SigGolf.Oracle", "SigGolf.Riscv",
-                    "SigGolf.Programs", "SigGolf.Security", "SigGolf.Statements"}
+                    "SigGolf.Programs", "SigGolf.Security", "SigGolf.Statements", "SigGolf.Images"}
+
+
+def admitted_file(name: str) -> bool:
+    path = Path(name)
+    return name in {"Solution.lean", "claim.json", *IMAGE_FILES} or (
+        path.parts[0:1] == ("SigGolfCandidate",) and path.suffix == ".lean" and
+        all(MODULE.fullmatch(part) for part in path.with_suffix("").parts))
+
+
+def admitted_directory(name: str) -> bool:
+    path = Path(name)
+    return name == "images" or (path.parts[0:1] == ("SigGolfCandidate",) and
+                                all(MODULE.fullmatch(part) for part in path.parts))
 
 
 def strip_comments(source: str) -> str:
@@ -54,7 +69,7 @@ def imports(source: str) -> list[str]:
         line = line.strip()
         if not line:
             continue
-        if line.startswith("prelude") or line.startswith("module "):
+        if line.split(maxsplit=1)[0] in {"prelude", "module"}:
             raise ValueError("alternate module headers are not allowed")
         if line.startswith("import"):
             parts = line.split()
@@ -116,13 +131,11 @@ def check(root: Path) -> dict:
             errors.append(f"{rel}: symlinks and special files are forbidden")
             continue
         if path.is_dir():
-            if rel.parts[0] != "SigGolfCandidate":
-                errors.append(f"{rel}: only SigGolfCandidate/ may contain modules")
+            if not admitted_directory(rel.as_posix()):
+                errors.append(f"{rel}: only SigGolfCandidate/ and images/ directories are admitted")
             continue
-        if rel.as_posix() not in {"Solution.lean", "claim.json"} and not (
-            rel.parts[0] == "SigGolfCandidate" and path.suffix == ".lean" and
-            all(MODULE.fullmatch(part) for part in rel.with_suffix("").parts)):
-            errors.append(f"{rel}: only Solution.lean, claim.json, and SigGolfCandidate modules are admitted")
+        if not admitted_file(rel.as_posix()):
+            errors.append(f"{rel}: file is outside the admitted submission paths")
             continue
         size = path.stat().st_size
         total += size
@@ -132,11 +145,16 @@ def check(root: Path) -> dict:
         errors.append("submission exceeds 16 MiB")
     if not (root / "Solution.lean").is_file():
         errors.append("Solution.lean is required")
+    # Do not open rejected paths (including symlinks and oversized source files).
+    if errors:
+        return {"ok": False, "claim": None, "score": None,
+                "files": len(files), "bytes": total, "errors": errors}
     try:
         values = claim(root / "claim.json")
+        load_images(root)
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         values = None
-        errors.append(f"invalid claim.json: {exc}")
+        errors.append(f"invalid claim or images: {exc}")
     modules = {".".join(path.relative_to(root).with_suffix("").parts)
                for path in files if path.is_file() and path.suffix == ".lean"}
     for path in files:
