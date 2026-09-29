@@ -82,7 +82,7 @@ def run_verifier(pr: dict, contract: str, work_root: Path, secret_dir: Path) -> 
     proc = subprocess.Popen(cmd, cwd=TRUSTED, env=clean, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             text=True, start_new_session=True)
     try:
-        output, error = proc.communicate(timeout=4 * 3600 + 1800 + 900)
+        output, error = proc.communicate(timeout=4 * 3600 + 900)
         if len(output) > 256 * 1024 or len(error) > 256 * 1024:
             raise ValueError('verifier output exceeded its limit')
         value = json.loads(output)

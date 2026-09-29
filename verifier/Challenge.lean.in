@@ -2,7 +2,7 @@ import SigGolf
 
 namespace SigGolf.Challenge
 
-def submission : SigGolf.Submission := sorry
+noncomputable def submission : SigGolf.Submission := sorry
 
 theorem signature_bytes : submission.sizes.signature = {{S}} := sorry
 

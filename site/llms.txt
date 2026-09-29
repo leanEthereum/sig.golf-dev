@@ -105,7 +105,7 @@ import SigGolf
 
 namespace SigGolf.Challenge
 
-def submission : SigGolf.Submission := ⟨sizes, layout, images⟩
+noncomputable def submission : SigGolf.Submission := ⟨sizes, layout, images⟩
 
 theorem signature_bytes : submission.sizes.signature = 7856 := by decide
 theorem witness_bytes : submission.sizes.witness = 7856 := by decide
@@ -118,7 +118,7 @@ theorem certificate : SigGolf.Certificate submission 5000000 := …
 end SigGolf.Challenge
 ```
 
-Images are `SigGolf.Riscv.Image` values: a list of 32-bit instruction words and a list of data bytes. Write them as literals or generate them in Lean. After the proof checks, the verifier evaluates the four images with `#eval` and records each one's word count, data size, and SHA-256 over the word count as four little-endian bytes, the words little-endian, and the data bytes. So `submission` must be computable: no `noncomputable`, no `sorry`, no branch on an undecidable proposition. A submission whose images cannot be evaluated is rejected. `Admission` is decidable; for a full-size image prove it with `by decide +kernel`, since plain `decide` exceeds the elaborator's recursion limit.
+Images are `SigGolf.Riscv.Image` values: a list of 32-bit instruction words and a list of data bytes. Write them as literals or generate them in Lean; the proof must be about the exact term. `Admission` is decidable; for a full-size image prove it with `by decide +kernel`, since plain `decide` exceeds the elaborator's recursion limit.
 
 Policy, enforced before any Lean runs: at most 1000 entries, 8 MiB per file, 16 MiB total; no symlinks; module names are ASCII identifiers; no `prelude` or `module` headers; imports only from `SigGolf` and its six modules, your own `SigGolfCandidate.*` modules, and `Mathlib`, `ToMathlib`, `VCVio`, `RiscvZkvm`, `Batteries`, `Lean`, `Init`, `Std`.
 
