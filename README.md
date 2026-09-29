@@ -121,7 +121,7 @@ Consider the following experiment for a classical probabilistic adversary `A` wi
 1. Sample H and a uniform secret key independently. Initialize an empty transcript T and count all calls to H throughout the experiment.
 2. Run `keygen(secretKey)`. Failure ends the experiment without a win; otherwise give `A` the public key and cache.
 3. `A` may then adaptively query two oracles:
-   - **`random_oracle(input_A)`:** return H(input_A).
+   - **`random_oracle(input_A)`:** for an `input_A` of 64·k bytes, return H(input_A).
    - **`signing_oracle(message_A, cache_A)`:** run `sign(secretKey, cache_A, message_A)` using the original secret key. Return the signature or failure. Add each returned `(message_A, signature)` to T. Allow at most `LIFETIME` requests.
 4. `A` makes one final submission, choosing either form below:
    - **witness weak unforgeability:** submit `(message_A, witness_A)`. `A` wins if `verify(message_A, public key, witness_A)` accepts, and no pair in T has message `message_A`, and the total hash-call count is at most Q
@@ -168,7 +168,7 @@ ECALL selects one of two services through `t0`:
 |    0 | HASH    | `a0 = input address`, `a1 = input length in bytes`, `a2 = output address` |
 |    1 | HALT    | `a0 = exit code` (0 = success)                                            |
 
-HASH writes H's 32-byte answer at the output address.
+HASH writes H's 32-byte answer at the output address. Any other `t0` fails.
 
 ### Further Details
 
@@ -179,6 +179,7 @@ HASH writes H's 32-byte answer at the output address.
 - **Bounds:** every memory access and buffer must fit completely in memory. For unsigned byte address p and length n, require `p + n <= 0x1000000`. Instruction arithmetic and effective-address calculation follow RV64IM.
 - **HASH arguments:** addresses and byte length n are unsigned 64-bit values. The input and output addresses must both be 8-byte aligned, and n must be a nonzero multiple of 64. The input’s n bytes and the output’s 32 bytes must fit entirely in memory.
 - **HASH execution:** read the n input bytes in increasing address order; they are H’s input. Read all input before writing the answer, so buffers may overlap. Preserve registers and advance PC by 4.
+- **Faults:** an encoding outside RV64IM (such as compressed, A, F, D, CSR, or `FENCE.I`), invalid HASH arguments, or any other fault ends the run as a failure; for `verify`, a rejection.
 
 ## Lean project
 

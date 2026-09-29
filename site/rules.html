@@ -165,7 +165,7 @@
             <li>Run <a href="#keygen"><code>keygen(secretKey)</code></a>. Failure ends the experiment without a win; otherwise give <code>A</code> the public key and cache.</li>
             <li><code>A</code> may then adaptively query two oracles:
           <div class="two-cards">
-            <div class="detail-card"><b><code>random_oracle(input_A)</code></b><p>Return <code>H(input_A)</code>.</p></div>
+            <div class="detail-card"><b><code>random_oracle(input_A)</code></b><p>For an <code>input_A</code> of <code>64·k</code> bytes, return <code>H(input_A)</code>.</p></div>
             <div class="detail-card"><b><code>signing_oracle(message_A, cache_A)</code></b><p>Run <a href="#sign"><code>sign(secretKey, cache_A, message_A)</code></a> with the original secret key. Return the signature or failure. Add each returned <code>(message_A, signature)</code> to <code>T</code>. Allow at most <a href="#parameter-lifetime"><math class="rule-math" aria-label="L, signing lifetime" title="LIFETIME"><mi>L</mi></math></a> requests.</p></div>
           </div></li>
             <li><code>A</code> makes one final submission in either form:
@@ -213,7 +213,7 @@
             <tr><td><code>0</code></td><td>HASH</td><td><code>a0 = input address</code>, <code>a1 = input length in bytes</code>, <code>a2 = output address</code></td></tr>
             <tr><td><code>1</code></td><td>HALT</td><td><code>a0 = exit code</code> (0 = success)</td></tr>
           </tbody></table></div>
-          <p>HASH writes <code>H</code>'s 32-byte answer at the output address.</p>
+          <p>HASH writes <code>H</code>'s 32-byte answer at the output address. Any other <code>t0</code> fails.</p>
 
           <h3>Further details</h3>
           <dl class="detail-list">
@@ -224,6 +224,7 @@
             <div><dt>Bounds</dt><dd>Every memory access and buffer must fit completely in memory. For unsigned byte address <code>p</code> and length <code>n</code>, require <math class="rule-math" aria-label="p plus n is at most hexadecimal one zero zero zero zero zero zero"><mi>p</mi><mo>+</mo><mi>n</mi><mo>≤</mo><mn>0x1000000</mn></math>. Instruction arithmetic and effective-address calculation follow RV64IM.</dd></div>
             <div><dt>HASH arguments</dt><dd>Addresses and byte length <code>n</code> are unsigned 64-bit values. The input and output addresses must both be 8-byte aligned, and <code>n</code> must be a nonzero multiple of 64. The input's <code>n</code> bytes and the output's 32 bytes must fit entirely in memory.</dd></div>
             <div><dt>HASH execution</dt><dd>Read the <code>n</code> input bytes in increasing address order; they are <code>H</code>'s input. Read all input before writing the answer, so buffers may overlap. Preserve registers and advance PC by 4.</dd></div>
+            <div><dt>Faults</dt><dd>An encoding outside RV64IM (such as compressed, A, F, D, CSR, or <code>FENCE.I</code>), invalid HASH arguments, or any other fault ends the run as a failure; for <code>verify</code>, a rejection.</dd></div>
           </dl>
         </section>
 
