@@ -20,6 +20,17 @@ ALLOWED_CONTRACT = {"SigGolf", "SigGolf.Parameters", "SigGolf.Oracle", "SigGolf.
                     "SigGolf.Programs", "SigGolf.Security", "SigGolf.Statements"}
 
 
+def admitted_file(name: str) -> bool:
+    path = Path(name)
+    return name in {"Solution.lean", "claim.json"} or (
+        path.parts[0:1] == ("SigGolfCandidate",) and path.suffix == ".lean" and
+        all(MODULE.fullmatch(part) for part in path.with_suffix("").parts))
+
+
+def admitted_directory(name: str) -> bool:
+    return Path(name).parts[0:1] == ("SigGolfCandidate",)
+
+
 def strip_comments(source: str) -> str:
     """Remove nested block and line comments while retaining newlines and token gaps."""
     out = []
@@ -54,7 +65,7 @@ def imports(source: str) -> list[str]:
         line = line.strip()
         if not line:
             continue
-        if line.startswith("prelude") or line.startswith("module "):
+        if line.split(maxsplit=1)[0] in {"prelude", "module"}:
             raise ValueError("alternate module headers are not allowed")
         if line.startswith("import"):
             parts = line.split()
@@ -116,12 +127,10 @@ def check(root: Path) -> dict:
             errors.append(f"{rel}: symlinks and special files are forbidden")
             continue
         if path.is_dir():
-            if rel.parts[0] != "SigGolfCandidate":
+            if not admitted_directory(rel.as_posix()):
                 errors.append(f"{rel}: only SigGolfCandidate/ may contain modules")
             continue
-        if rel.as_posix() not in {"Solution.lean", "claim.json"} and not (
-            rel.parts[0] == "SigGolfCandidate" and path.suffix == ".lean" and
-            all(MODULE.fullmatch(part) for part in rel.with_suffix("").parts)):
+        if not admitted_file(rel.as_posix()):
             errors.append(f"{rel}: only Solution.lean, claim.json, and SigGolfCandidate modules are admitted")
             continue
         size = path.stat().st_size

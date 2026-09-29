@@ -37,6 +37,14 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(value['ok'])
         self.assertIn('outside the allowed modules', value['errors'][0])
 
+    def test_module_header_cannot_hide_public_imports(self):
+        for header in ('module', 'module -- comment', '\ufeffmodule', '/- comment -/ module'):
+            with self.subTest(header=header):
+                (self.root / 'Solution.lean').write_text(header + '\npublic import Lake\n')
+                value = check(self.root)
+                self.assertFalse(value['ok'])
+                self.assertTrue(any('alternate module headers' in error for error in value['errors']))
+
     def test_symlink_and_archive_file_are_rejected(self):
         (self.root / 'SigGolfCandidate' / 'Alias.lean').symlink_to('Helper.lean')
         (self.root / 'notes.zip').write_bytes(b'irrelevant')
