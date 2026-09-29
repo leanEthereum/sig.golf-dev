@@ -96,11 +96,12 @@ class FetchTests(unittest.TestCase):
             self.run_fetch(b'x' * len(self.raw))
         self.assertFalse((self.destination / 'Solution.lean').exists())
 
-    def test_raw_image_paths_are_admitted(self):
-        self.entries = [{'path': 'images', 'type': 'tree', 'mode': '040000', 'sha': 'd' * 40},
-                        blob('images/keygen.code', self.raw)]
+    def test_candidate_module_paths_are_admitted(self):
+        self.entries = [{'path': 'SigGolfCandidate', 'type': 'tree', 'mode': '040000', 'sha': 'd' * 40},
+                        {'path': 'SigGolfCandidate/Nested', 'type': 'tree', 'mode': '040000', 'sha': 'e' * 40},
+                        blob('SigGolfCandidate/Nested/Helper.lean', self.raw)]
         self.run_fetch()
-        self.assertEqual((self.destination / 'images/keygen.code').read_bytes(), self.raw)
+        self.assertEqual((self.destination / 'SigGolfCandidate/Nested/Helper.lean').read_bytes(), self.raw)
 
 
 class Response(io.BytesIO):

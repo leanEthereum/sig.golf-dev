@@ -2,7 +2,6 @@
   "challenge_module": "SigGolf.Challenge",
   "solution_module": "Solution",
   "theorem_names": [
-    "SigGolf.Challenge.images_match",
     "SigGolf.Challenge.signature_bytes",
     "SigGolf.Challenge.witness_bytes",
     "SigGolf.Challenge.cache_bytes",

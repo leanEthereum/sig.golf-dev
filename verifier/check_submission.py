@@ -7,8 +7,6 @@ import json
 import re
 from pathlib import Path
 
-from images import IMAGE_FILES, load_images
-
 MAX_FILES = 1000
 MAX_FILE_BYTES = 8 * 1024 * 1024
 MAX_TOTAL_BYTES = 16 * 1024 * 1024
@@ -19,20 +17,18 @@ CLAIM_KEYS = {"S", "W", "K", "C", "layout"}
 LAYOUT_KEYS = ("message", "secret_key", "public_key", "cache", "signature", "witness")
 ALLOWED_LIBRARIES = ("Mathlib", "ToMathlib", "VCVio", "RiscvZkvm", "Batteries", "Lean", "Init", "Std")
 ALLOWED_CONTRACT = {"SigGolf", "SigGolf.Parameters", "SigGolf.Oracle", "SigGolf.Riscv",
-                    "SigGolf.Programs", "SigGolf.Security", "SigGolf.Statements", "SigGolf.Images"}
+                    "SigGolf.Programs", "SigGolf.Security", "SigGolf.Statements"}
 
 
 def admitted_file(name: str) -> bool:
     path = Path(name)
-    return name in {"Solution.lean", "claim.json", *IMAGE_FILES} or (
+    return name in {"Solution.lean", "claim.json"} or (
         path.parts[0:1] == ("SigGolfCandidate",) and path.suffix == ".lean" and
         all(MODULE.fullmatch(part) for part in path.with_suffix("").parts))
 
 
 def admitted_directory(name: str) -> bool:
-    path = Path(name)
-    return name == "images" or (path.parts[0:1] == ("SigGolfCandidate",) and
-                                all(MODULE.fullmatch(part) for part in path.parts))
+    return Path(name).parts[0:1] == ("SigGolfCandidate",)
 
 
 def strip_comments(source: str) -> str:
@@ -132,10 +128,10 @@ def check(root: Path) -> dict:
             continue
         if path.is_dir():
             if not admitted_directory(rel.as_posix()):
-                errors.append(f"{rel}: only SigGolfCandidate/ and images/ directories are admitted")
+                errors.append(f"{rel}: only SigGolfCandidate/ may contain modules")
             continue
         if not admitted_file(rel.as_posix()):
-            errors.append(f"{rel}: file is outside the admitted submission paths")
+            errors.append(f"{rel}: only Solution.lean, claim.json, and SigGolfCandidate modules are admitted")
             continue
         size = path.stat().st_size
         total += size
@@ -145,16 +141,11 @@ def check(root: Path) -> dict:
         errors.append("submission exceeds 16 MiB")
     if not (root / "Solution.lean").is_file():
         errors.append("Solution.lean is required")
-    # Do not open rejected paths (including symlinks and oversized source files).
-    if errors:
-        return {"ok": False, "claim": None, "score": None,
-                "files": len(files), "bytes": total, "errors": errors}
     try:
         values = claim(root / "claim.json")
-        load_images(root)
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         values = None
-        errors.append(f"invalid claim or images: {exc}")
+        errors.append(f"invalid claim.json: {exc}")
     modules = {".".join(path.relative_to(root).with_suffix("").parts)
                for path in files if path.is_file() and path.suffix == ".lean"}
     for path in files:

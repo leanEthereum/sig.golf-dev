@@ -1,11 +1,8 @@
 import SigGolf
-import SigGolf.Images
 
 namespace SigGolf.Challenge
 
 noncomputable def submission : SigGolf.Submission := sorry
-
-theorem images_match : submission.image = SigGolf.Images.images := sorry
 
 theorem signature_bytes : submission.sizes.signature = {{S}} := sorry
 

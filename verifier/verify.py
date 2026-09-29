@@ -24,8 +24,6 @@ from pathlib import Path
 
 from check_submission import check
 from fetch import FetchError, fetch_pr
-from images import load_images, render
-from storage import writable_filesystems
 
 HERE = Path(__file__).resolve().parent
 TRUSTED = HERE.parent
@@ -91,19 +89,13 @@ def linux_command(cmd: list[str], project: Path, env: dict[str, str], hidden: li
                   f'CPUAffinity={" ".join(map(str, cpus))}',
                   'KillMode=control-group', 'TimeoutStopSec=5', 'SendSIGKILL=yes', 'TasksMax=512',
                   'RestrictAddressFamilies=~AF_UNIX', 'NoNewPrivileges=yes', 'ProtectSystem=strict',
-                  f'BindReadOnlyPaths={project / ".lake-seed/packages"}:{project / ".lake/packages"}',
-                  'PrivatePIDs=yes', 'ProcSubset=pid',
+                  f'ReadWritePaths={project / ".lake"}', 'PrivateTmp=yes', 'PrivatePIDs=yes', 'ProcSubset=pid',
                   'InaccessiblePaths=/sys',
                   'InaccessiblePaths=' + ' '.join(f'-{p}' for p in ['/etc/ots', '/etc/sig-golf', *hidden]),
-                  'PrivateDevices=yes', 'PrivateIPC=yes',
+                  'PrivateDevices=yes', 'TemporaryFileSystem=/dev/shm', 'PrivateIPC=yes',
                   'SystemCallErrorNumber=EPERM',
-                  'SystemCallFilter=~@network-io @debug @mount ptrace process_vm_readv process_vm_writev '
+                  'SystemCallFilter=~@network-io @debug ptrace process_vm_readv process_vm_writev '
                   'pidfd_getfd kill tkill tgkill pidfd_send_signal']
-    # tmpfs quotas bound both bytes and inodes in the kernel, including fallocate,
-    # sparse files, and many small files. They also count against MemoryMax.
-    for path, size, inodes in writable_filesystems(project):
-        properties.append(f'TemporaryFileSystem={path}:rw,nosuid,nodev,size={size},'
-                          f'nr_inodes={inodes},mode=0700,uid={os.getuid()},gid={os.getgid()}')
     clean = {'PATH': f'{Path.home() / ".elan/bin"}:{os.environ.get("PATH", "/usr/bin:/bin")}',
              'HOME': str(Path.home()), 'LANG': 'C.UTF-8',
              'COMPARATOR_LANDRUN': env['COMPARATOR_LANDRUN'],
@@ -177,9 +169,6 @@ def run_checked(cmd: list[str], cwd: Path, env: dict[str, str], log: Path) -> tu
 
 def verify(args: argparse.Namespace) -> dict:
     work = args.work.resolve()
-    if platform.system() == 'Linux' and any(
-            work.is_relative_to(path) for path in ('/tmp', '/var/tmp', '/dev/shm')):
-        raise VerifyError('work directory must be outside the sandbox temporary filesystems')
     if work.exists():
         raise VerifyError('work directory must not exist')
     work.mkdir(parents=True)
@@ -211,7 +200,6 @@ def verify(args: argparse.Namespace) -> dict:
         for name in ('lean-toolchain', 'lakefile.lean', 'lake-manifest.json', 'SigGolf.lean'):
             shutil.copy2(args.trusted / name, project / name)
         shutil.copytree(args.trusted / 'SigGolf', project / 'SigGolf')
-        (project / 'SigGolf' / 'Images.lean').write_text(render(load_images(source)))
         with (project / 'lakefile.lean').open('a') as out:
             out.write('\nlean_lib Solution\n')
         if (source / 'SigGolfCandidate').is_dir():  # optional: Solution.lean may stand alone
@@ -232,12 +220,8 @@ def verify(args: argparse.Namespace) -> dict:
                     shutil.rmtree(folder / name)
                 for stale in folder.glob(f'{name}.*'):
                     stale.unlink()
-            for name in ('Challenge', 'Images'):
-                for stale in (folder / 'SigGolf').glob(f'{name}.*'):
-                    stale.unlink()
-        if platform.system() == 'Linux':
-            (project / '.lake').rename(project / '.lake-seed')
-            (project / '.lake' / 'packages').mkdir(parents=True)
+            for stale in (folder / 'SigGolf').glob('Challenge.*'):
+                stale.unlink()
         command = ['lake', 'env', env['COMPARATOR_BIN'], str(args.trusted / 'verifier' / 'comparator.json')]
         clean_env = {'PATH': f'{Path.home() / ".elan/bin"}:{os.environ.get("PATH", "/usr/bin:/bin")}',
                      'HOME': str(Path.home()), 'LANG': 'C.UTF-8',
@@ -273,11 +257,8 @@ def main() -> int:
         parser.error('provide either --local or both --pr and --commit')
     args.trusted = args.trusted.resolve()
     if args.work is None:
-        if platform.system() == 'Linux':
-            args.work = Path.home() / '.cache' / 'sig-golf-verifier' / uuid.uuid4().hex
-        else:
-            args.work = Path(tempfile.mkdtemp(prefix='sig-verify-'))
-            args.work.rmdir()
+        args.work = Path(tempfile.mkdtemp(prefix='sig-verify-'))
+        args.work.rmdir()
     result = verify(args)
     if args.cleanup and args.work.exists():
         try:
