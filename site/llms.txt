@@ -39,7 +39,7 @@ The only hash is the syscall HASH, a random oracle on inputs of 64·k bytes retu
 
 Memory faults, misaligned accesses, invalid HASH arguments, unknown syscalls, EBREAK, and HALT with a nonzero code fail the program at 1 cycle with no oracle call; an invalid fetch or encoding fails at 0 cycles. A failed verify is a rejection.
 
-Honest budgets, in 64-byte compressions: keygen 2^20, sign 2^17, expand 2^20. Verify has no budget; its cycles are the score.
+Honest budgets, in 64-byte compressions: keygen 2^20, sign 2^17, expand 2^20. Verify has no budget; its cycles are the score. These are the `full` track's. This repository's `constrained` and `laptop` tracks instead allow 60 s of keygen and 2 s of signing on a Ledger Nano S+-class secure element or a laptop, at the declared hash's rate, with 2^16 or 2^32 signing requests and a cycle limit of 2^32 or 2^40; see the Tracks section of RULES.md.
 
 ## What the certificate proves
 
@@ -54,7 +54,7 @@ Honest budgets, in 64-byte compressions: keygen 2^20, sign 2^17, expand 2^20. Ve
 
 ## The security game, condensed
 
-Sample the oracle and a uniform secret key; run keygen; give the adversary the public key and the cache. The adversary may query the oracle, and may ask for signatures on messages of its choice with a cache of its choice, up to 2^32 requests. It finally submits either a witness for a message never signed, or a (message, signature) pair the signing oracle never returned; the latter is checked through expand and verify. Every hash call in the whole experiment counts toward Q: keygen's, the signing oracle's, the adversary's own, and the final check's.
+Sample the oracle and a uniform secret key; run keygen; give the adversary the public key and the cache. The adversary may query the oracle, and may ask for signatures on messages of its choice with a cache of its choice, up to 2^32 requests (2^16 on `constrained`). It finally submits either a witness for a message never signed, or a (message, signature) pair the signing oracle never returned; the latter is checked through expand and verify. Every hash call in the whole experiment counts toward Q: keygen's, the signing oracle's, the adversary's own, and the final check's.
 
 ## Consequences that bite
 
@@ -97,6 +97,8 @@ presentation/scheme.svg         optional, only with "diagram": true
             "signature": 131168, "witness": 139024}}
 ```
 
+On the `constrained` and `laptop` tracks, the claim adds `"hash": "blake2s"` or `"sha256"`, and the certificate is `(SigGolf.Device.rules .constrained .blake2s).Certificate submission 5000000` with that track and hash.
+
 `Solution.lean` must define and prove exactly this, with the same numbers as `claim.json`. The verifier generates its own `SigGolf.Challenge` with these statements and `sorry`, then compares yours against it, so do not import `SigGolf.Challenge`:
 
 ```lean
@@ -120,7 +122,7 @@ end SigGolf.Challenge
 
 Images are `SigGolf.Riscv.Image` values: a list of 32-bit instruction words and a list of data bytes. Write them as literals or generate them in Lean; the proof must be about the exact term. `Admission` is decidable; for a full-size image prove it with `by decide +kernel`, since plain `decide` exceeds the elaborator's recursion limit.
 
-Policy, enforced before any Lean runs: at most 1000 entries, 8 MiB per file, 16 MiB total; no symlinks; module names are ASCII identifiers; no `prelude` or `module` headers; imports only from `SigGolf` and its six modules, your own `SigGolfCandidate.*` modules, and `Mathlib`, `ToMathlib`, `VCVio`, `RiscvZkvm`, `Batteries`, `Lean`, `Init`, `Std`.
+Policy, enforced before any Lean runs: at most 1000 entries, 8 MiB per file, 16 MiB total; no symlinks; module names are ASCII identifiers; no `prelude` or `module` headers; imports only from `SigGolf` and its seven modules, your own `SigGolfCandidate.*` modules, and `Mathlib`, `ToMathlib`, `VCVio`, `RiscvZkvm`, `Batteries`, `Lean`, `Init`, `Std`.
 
 Proof checking, in a sandbox without network: the organizer's challenge is built and exported first, then your solution is built, exported, compared statement by statement against the challenge, and replayed through the Lean kernel. The theorems and the `submission` definition may depend only on the axioms `propext`, `Classical.choice`, and `Quot.sound`: no `sorry`, no `native_decide`. Toolchain `leanprover/lean4:v4.33.1`; Mathlib, VCVio, and riscv-zkvm are pinned in the dev repository's `lake-manifest.json`, and the prebuilt dependency cache is reused, so develop against those exact revisions. Limits: 4 hours wall clock, 24 GiB, two CPUs. A verified PR gets a success status on its commit and an entry in records.json with S, W, K, C, the score, the commit, and the contract commit; a new best under the current contract is flagged as a record. Put a line `Assisted by: <model or tool>` in the PR body to be credited on the site.
 

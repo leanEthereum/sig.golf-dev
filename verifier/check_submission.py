@@ -14,10 +14,12 @@ MODULE = re.compile(r"[A-Za-z_][A-Za-z0-9_']*(?:\.[A-Za-z_][A-Za-z0-9_']*)*")
 INTEGER = re.compile(r"0|[1-9][0-9]*")
 MEMORY_BYTES = 1 << 24
 CLAIM_KEYS = {"S", "W", "K", "C", "layout"}
+TRACKS = ("full", "constrained", "laptop")
+HASHES = ("blake2s", "sha256")
 LAYOUT_KEYS = ("message", "secret_key", "public_key", "cache", "signature", "witness")
 ALLOWED_LIBRARIES = ("Mathlib", "ToMathlib", "VCVio", "RiscvZkvm", "Batteries", "Lean", "Init", "Std")
 ALLOWED_CONTRACT = {"SigGolf", "SigGolf.Parameters", "SigGolf.Oracle", "SigGolf.Riscv",
-                    "SigGolf.Programs", "SigGolf.Security", "SigGolf.Statements"}
+                    "SigGolf.Programs", "SigGolf.Security", "SigGolf.Statements", "SigGolf.Tracks"}
 
 
 def strip_comments(source: str) -> str:
@@ -66,13 +68,20 @@ def imports(source: str) -> list[str]:
     return found
 
 
-def claim(path: Path) -> dict[str, int | dict[str, int]]:
+def claim(path: Path, track: str = "full") -> dict[str, int | str | dict[str, int]]:
+    """The hardware tracks also declare the hash function H stands for."""
     raw = path.read_bytes()
     if len(raw) > 512:
         raise ValueError("claim.json exceeds 512 bytes")
     value = json.loads(raw)
-    if not isinstance(value, dict) or set(value) != CLAIM_KEYS:
-        raise ValueError("claim.json must contain exactly S, W, K, C, and layout")
+    if track == "full":
+        if not isinstance(value, dict) or set(value) != CLAIM_KEYS:
+            raise ValueError("claim.json must contain exactly S, W, K, C, and layout")
+    else:
+        if not isinstance(value, dict) or set(value) != CLAIM_KEYS | {"hash"}:
+            raise ValueError("claim.json must contain exactly S, W, K, C, layout, and hash")
+        if value["hash"] not in HASHES:
+            raise ValueError("hash must be blake2s or sha256")
     if any(type(value[key]) is not int or not INTEGER.fullmatch(str(value[key]))
            for key in ("S", "W", "K", "C")):
         raise ValueError("S, W, K, and C must be nonnegative decimal integers")
@@ -102,7 +111,9 @@ def claim(path: Path) -> dict[str, int | dict[str, int]]:
     return value
 
 
-def check(root: Path) -> dict:
+def check(root: Path, track: str = "full") -> dict:
+    if track not in TRACKS:
+        raise ValueError(f"unknown track {track!r}")
     errors = []
     if root.is_symlink() or not root.is_dir():
         return {"ok": False, "errors": ["submission root is not a directory"]}
@@ -133,7 +144,7 @@ def check(root: Path) -> dict:
     if not (root / "Solution.lean").is_file():
         errors.append("Solution.lean is required")
     try:
-        values = claim(root / "claim.json")
+        values = claim(root / "claim.json", track)
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         values = None
         errors.append(f"invalid claim.json: {exc}")
@@ -158,7 +169,8 @@ def check(root: Path) -> dict:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("root", type=Path)
+    parser.add_argument("--track", choices=TRACKS, default="full")
     args = parser.parse_args()
-    result = check(args.root)
+    result = check(args.root, args.track)
     print(json.dumps(result, sort_keys=True))
     raise SystemExit(0 if result["ok"] else 1)

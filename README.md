@@ -1,26 +1,33 @@
 # sig.golf · rules
 
-Design a **stateless hash-based signature scheme** minimizing `S × C`: signature bytes times maximum honest verification cycles.
+Design a **stateless hash-based signature scheme** minimizing `S × C`: signature bytes times maximum honest verification cycles. Three [tracks](#tracks) set different keygen and signing budgets and lifetimes.
 
 ## Submission
 
 1. Four RISC-V program images: [keygen](#keygen), [sign](#sign), [expand](#expand), and [verify](#verify), including embedded data.
-2. Nonnegative integers `S`, `W`, `K`, and `C`: signature, witness, and cache bytes, and verification cycles.
+2. Nonnegative integers `S`, `W`, `K`, and `C`: signature, witness, and cache bytes, and verification cycles. On the `constrained` and `laptop` tracks, also the hash function H stands for: BLAKE2s or SHA-256.
 3. [Six byte offsets](#inputs-and-outputs) specifying where RISC-V inputs and outputs reside in memory.
 4. Lean 4 proofs of the [required statements](#required-lean-statements) for those exact images, sizes, layout, and bound.
 
 ## Parameters
 
-| Constant          |                 Value |
-| ----------------- | --------------------: |
-| `BUDGET_KEYGEN`   |     2^20 compressions |
-| `BUDGET_SIGN`     |     2^17 compressions |
-| `BUDGET_EXPAND`   |     2^20 compressions |
-| `FAILURE`         |                2^-128 |
-| `LIFETIME`        | 2^32 signing requests |
-| `SECURITY_BITS`   |                   127 |
-| `CYCLE_LIMIT`     |           2^32 cycles |
-| `MAX_PROGRAM_BYTES` |            2^20 bytes |
+Five constants depend on the [track](#tracks):
+
+| Constant        |                `full` |         `constrained` |              `laptop` |
+| --------------- | --------------------: | --------------------: | --------------------: |
+| `BUDGET_KEYGEN` |     2^20 compressions |    60 s on the device |    60 s on the device |
+| `BUDGET_SIGN`   |     2^17 compressions |     2 s on the device |     2 s on the device |
+| `BUDGET_EXPAND` |     2^20 compressions |     2^20 compressions |     2^20 compressions |
+| `LIFETIME`      | 2^32 signing requests | 2^16 signing requests | 2^32 signing requests |
+| `CYCLE_LIMIT`   |           2^32 cycles |           2^32 cycles |           2^40 cycles |
+
+The others are shared:
+
+| Constant            |      Value |
+| ------------------- | ---------: |
+| `FAILURE`           |     2^-128 |
+| `SECURITY_BITS`     |        127 |
+| `MAX_PROGRAM_BYTES` | 2^20 bytes |
 
 Every object has a fixed size in bytes:
 
@@ -32,6 +39,28 @@ Every object has a fixed size in bytes:
 | Cache      |           `K` (maximum 128 KiB) |
 | Signature  |           `S` (maximum 16 KiB) |
 | Witness    |           `W` (maximum 128 KiB) |
+
+## Tracks
+
+Every track scores `S × C` with the same programs, model, and statements. `full` sets its budgets in compressions. The hardware tracks budget keygen and signing in time on a device, to find the schemes best suited to keygen and signing on hardware:
+
+- **`constrained`:** a Ledger Nano S+-class secure element (ST33).
+- **`laptop`:** a laptop CPU.
+
+A hardware-track submission declares the hash function H stands for. Its `BUDGET_SIGN` and `BUDGET_KEYGEN` are the compressions the device completes with that hash in 2 s and 60 s, rounded down:
+
+| Device        | Hash    | Compressions per second | `BUDGET_SIGN` | `BUDGET_KEYGEN` |
+| ------------- | ------- | ----------------------: | ------------: | --------------: |
+| `constrained` | BLAKE2s |                  33,000 |        66,000 |       1,980,000 |
+| `constrained` | SHA-256 |                  25,000 |        50,000 |       1,500,000 |
+| `laptop`      | BLAKE2s |             250,000,000 |   500,000,000 |  15,000,000,000 |
+| `laptop`      | SHA-256 |   250,000,000 × 25 / 33 |   378,787,878 |  11,363,636,363 |
+
+The laptop's SHA-256 rate keeps the secure element's SHA-256 to BLAKE2s ratio, and its `CYCLE_LIMIT` makes the keygen budget reachable at 8 cycles per compression.
+
+**Pruning.** The constrained track's smaller `LIFETIME` lets a scheme trade signatures for cheaper keygen and signing, for example by [hypertree pruning](https://conduition.io/cryptography/hypertree-pruning/): the signer replaces most hypertree leaves with cheap surrogate hashes and grinds its randomizer until the message lands on a kept leaf. Keeping a fraction f of the few-time-signature leaves divides the safe number of signatures by 1/f, and grinding costs about 1/f compressions per signature, charged to `BUDGET_SIGN`; verification is unchanged.
+
+Organizer decisions set the tracks, devices, rates, time limits, hash declaration, lifetimes, and laptop `CYCLE_LIMIT`. Three values are proposals awaiting confirmation: the hardware tracks keep `full`'s `BUDGET_EXPAND`, `constrained` keeps its `CYCLE_LIMIT`, and budgets round down.
 
 ## Programs
 
@@ -103,7 +132,7 @@ For any `secretKey`, `message` and oracle H, consider the following experiment:
 
 Stop at the first failure. We say the `experiment succeeds` when all stages succeed and verification accepts.
 
-`N_P` counts program P's compressions; it is zero if P is never reached. `BUDGET_P` denotes P's named budget.
+`N_P` counts program P's compressions; it is zero if P is never reached. `BUDGET_P` denotes P's budget on the submission's track.
 
 1. **Completeness** ([Lean statement](SigGolf/Statements.lean#L21-L24)): for every secret key, `Pr_H[experiment succeeds for every message] >= 1 - FAILURE`.
 2. **Compression budgets** ([Lean statement](SigGolf/Statements.lean#L26-L31)): for every secret key and P in {`keygen`, `sign`, `expand`}, `E_{H,M}[2^(N_P / BUDGET_P)] <= 2`.
@@ -183,7 +212,7 @@ HASH writes H's 32-byte answer at the output address. Any other `t0` fails.
 
 ## Lean project
 
-[`SigGolf.Certificate submission C`](SigGolf/Statements.lean#L53-L60) in [SigGolf/Statements.lean](SigGolf/Statements.lean) is the competition claim for the exact four program images and declared sizes. Besides the five statements above, it contains [`Admission`](SigGolf/Statements.lean#L12-L16): the size maxima, the program size limit, and the buffer layout rules. [SigGolf/Security.lean](SigGolf/Security.lean) defines the attacker and both forgery experiments; [SigGolf/Riscv.lean](SigGolf/Riscv.lean) defines execution and costs. In Lean, the adversary is an `OracleComp` over coins, H, and the signing oracle: a computation that makes finitely many queries and then submits a forgery or gives up. A strategy that could run for ever is represented by its truncations, which give up where they are cut. Giving up never wins, and such a strategy's win probability is the limit of its truncations', so the bound over all adversaries bounds every adaptive strategy.
+[`SigGolf.Certificate submission C`](SigGolf/Statements.lean#L53-L60) in [SigGolf/Statements.lean](SigGolf/Statements.lean) is the `full` track's claim for the exact four program images and declared sizes. Besides the five statements above, it contains [`Admission`](SigGolf/Statements.lean#L12-L16): the size maxima, the program size limit, and the buffer layout rules. [SigGolf/Tracks.lean](SigGolf/Tracks.lean) restates the programs, the game, and the statements under a track's constants: a hardware-track claim is `(Device.rules device hash).Certificate submission C`, and `SigGolfTests` checks that the restatement under `full`'s constants is the original. [SigGolf/Security.lean](SigGolf/Security.lean) defines the attacker and both forgery experiments; [SigGolf/Riscv.lean](SigGolf/Riscv.lean) defines execution and costs. In Lean, the adversary is an `OracleComp` over coins, H, and the signing oracle: a computation that makes finitely many queries and then submits a forgery or gives up. A strategy that could run for ever is represented by its truncations, which give up where they are cut. Giving up never wins, and such a strategy's win probability is the limit of its truncations', so the bound over all adversaries bounds every adaptive strategy.
 
 Build the statements and regression checks with `lake build SigGolf SigGolfTests`. Dependencies are pinned in `lake-manifest.json`. These files define the requirements; they do not certify a particular signature scheme. Submissions are verified from the [sig.golf-submissions](https://github.com/leanEthereum/sig.golf-submissions) repository.
 
@@ -192,7 +221,7 @@ Build the statements and regression checks with `lake build SigGolf SigGolfTests
 - **Quantum security:** the security game only considers classical adversaries. NIST level 1 requires ≈ 64 bits of security against quantum adversaries.
 - **Single-user security:** the security game targets a single key, but a real attacker can target many users at once. The standard defense starts every hash with a per-key public parameter, so work against one user is useless against others. Drake's trick makes this cheap: a 16-byte parameter in the public key, padded with 48 zero bytes, fills the first 64-byte block of every hash, so its hash state is computed once and reused. Multi-user security then costs one compression and 16 bytes of public key.
 - **MPC for threshold signing:** the keygen and signing budgets let reasonably weak devices, such as hardware wallets, sign. Threshold signing runs keygen and sign inside multi-party computation (MPC), where hashing secret data costs far more. MPC precomputation followed by grinding on public values at signing can help (see [RivaLabs](https://github.com/RivaLabs-Core)).
-- **Trading lifetime for faster keygen and signing:** [hypertree pruning](https://conduition.io/cryptography/hypertree-pruning/) replaces most hypertree leaves with cheap placeholder hashes and grinds the randomizer until each message lands on a kept leaf, which speeds up keygen and signing without changing verification but lowers the safe number of signatures.
+- **Device model:** the hardware budgets count only compressions, at one rate per device and hash. Other instructions, memory (a secure element has far less than the 16 MiB modeled here), and communication with the host are not modeled.
 - **Choice of hash function:** the oracle H takes inputs made of 64-byte blocks, returns 32-byte answers, and costs one compression per block. This cost model is accurate for BLAKE2s, for BLAKE3 on inputs up to 1 KiB, and for the SHA-256 compression function, but less precise for standard SHA-256, whose padding adds a block to every input, and for SHA-3, which absorbs 136 bytes per permutation.
 - **Choice of ISA and metering:** RV64IM, the [cost of each instruction](#risc-v-programs), and details such as [where HASH reads its inputs](#system-calls) are one choice among many, and may not match a given zkVM.
 - **Delegating hashes of public values:** the budgets assume the enclave, such as a hardware wallet, computes every hash. Hashes of public values, typically for grinding, could be offloaded to a powerful host, possibly with a SNARK proving correctness.

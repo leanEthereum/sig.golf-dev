@@ -22,7 +22,7 @@ import time
 import uuid
 from pathlib import Path
 
-from check_submission import check
+from check_submission import TRACKS, check
 from fetch import FetchError, fetch_pr
 
 HERE = Path(__file__).resolve().parent
@@ -174,7 +174,7 @@ def verify(args: argparse.Namespace) -> dict:
     work.mkdir(parents=True)
     log = work / 'verify.log'
     result = {'status': 'failed', 'commit': args.commit, 'contract_commit': None,
-              'log': str(log), 'claim': None}
+              'log': str(log), 'claim': None, 'track': args.track}
     try:
         env = tools_env(args.trusted)
         if platform.system() == 'Linux':
@@ -189,7 +189,7 @@ def verify(args: argparse.Namespace) -> dict:
             shutil.copytree(args.local, source, symlinks=True)
         else:
             fetch_pr(args.repository, args.pr, args.commit, source)
-        policy = check(source)
+        policy = check(source, args.track)
         result['claim'] = policy['claim']
         if not policy['ok']:
             result.update(status='policy_rejected', errors=policy['errors'])
@@ -208,6 +208,12 @@ def verify(args: argparse.Namespace) -> dict:
         challenge = (args.trusted / 'verifier' / 'Challenge.lean.in').read_text()
         placeholders = {key: policy['claim'][key] for key in ('S', 'W', 'K', 'C')}
         placeholders.update({key.upper(): value for key, value in policy['claim']['layout'].items()})
+        # The policy check admitted only a known track and, on hardware tracks, a known hash.
+        if args.track == 'full':
+            placeholders['CERTIFICATE'] = f"SigGolf.Certificate submission {policy['claim']['C']}"
+        else:
+            placeholders['CERTIFICATE'] = (f"(SigGolf.Device.rules .{args.track} .{policy['claim']['hash']})"
+                                           f".Certificate submission {policy['claim']['C']}")
         for key, value in placeholders.items():
             challenge = challenge.replace('{{' + key + '}}', str(value))
         (project / 'SigGolf' / 'Challenge.lean').write_text(challenge)
@@ -248,6 +254,7 @@ def main() -> int:
     parser.add_argument('--pr', type=int)
     parser.add_argument('--commit')
     parser.add_argument('--local', type=Path)
+    parser.add_argument('--track', choices=TRACKS, default='full')
     parser.add_argument('--trusted', type=Path, default=TRUSTED)
     parser.add_argument('--work', type=Path)
     parser.add_argument('--hide', type=Path, action='append', default=[])

@@ -14,6 +14,8 @@ theorem layout_offsets : submission.layout =
   { message := {{MESSAGE}}, secretKey := {{SECRET_KEY}}, publicKey := {{PUBLIC_KEY}},
     cache := {{CACHE}}, signature := {{SIGNATURE}}, witness := {{WITNESS}} } := sorry
 
-theorem certificate : SigGolf.Certificate submission {{C}} := sorry
+-- On `full`, `SigGolf.Certificate submission C`; on the hardware tracks,
+-- `(SigGolf.Device.rules device hash).Certificate submission C`.
+theorem certificate : {{CERTIFICATE}} := sorry
 
 end SigGolf.Challenge

@@ -51,6 +51,35 @@ example : ¬ ({ hashImage 128 with data := List.replicate 32 0 } : Image).Valid 
     { standardLayout toySizes with witness := MEMORY_BYTES - 16 } := by decide
 example : toy.Admission := by decide
 
+-- Hardware tracks: each budget is the device's whole compressions in the allowed time.
+example : Device.compressions .constrained .blake2s SIGN_SECONDS = 66000 ∧
+    Device.compressions .constrained .blake2s KEYGEN_SECONDS = 1980000 ∧
+    Device.compressions .constrained .sha256 SIGN_SECONDS = 50000 ∧
+    Device.compressions .constrained .sha256 KEYGEN_SECONDS = 1500000 ∧
+    Device.compressions .laptop .blake2s SIGN_SECONDS = 500000000 ∧
+    Device.compressions .laptop .blake2s KEYGEN_SECONDS = 15000000000 ∧
+    Device.compressions .laptop .sha256 SIGN_SECONDS = 378787878 ∧
+    Device.compressions .laptop .sha256 KEYGEN_SECONDS = 11363636363 := by decide
+example (hash : HashFunction) :
+    (Device.rules .constrained hash).lifetime = 2 ^ 16 ∧
+    (Device.rules .laptop hash).lifetime = 2 ^ 32 ∧
+    (Device.rules .constrained hash).cycleLimit = 2 ^ 32 ∧
+    (Device.rules .laptop hash).cycleLimit = 2 ^ 40 ∧
+    (Device.rules .constrained hash).expandBudget = 2 ^ 20 ∧
+    (Device.rules .laptop hash).expandBudget = 2 ^ 20 := by
+  cases hash <;> decide
+-- Each track's cycle limit holds its keygen budget at 8 cycles per compression.
+example : 8 * Device.compressions .laptop .blake2s KEYGEN_SECONDS < LAPTOP_CYCLE_LIMIT ∧
+    8 * Device.compressions .constrained .blake2s KEYGEN_SECONDS < CYCLE_LIMIT := by decide
+-- Under `Rules.full` the restatement is the original contract.
+example : Rules.full.budget = Program.budget := by funext program; cases program <;> rfl
+example : Rules.run Rules.full = @Submission.run := rfl
+example : Rules.honest Rules.full = Submission.honest := rfl
+example : Rules.game Rules.full = @Submission.game := rfl
+example (submission : Submission) (C : Nat) :
+    Rules.full.Certificate submission C ↔ Certificate submission C :=
+  ⟨fun ⟨a, b, c, d, e, f⟩ => ⟨a, b, c, d, e, f⟩, fun ⟨a, b, c, d, e, f⟩ => ⟨a, b, c, d, e, f⟩⟩
+
 /-- A run cut off after `steps` instructions has spent at least `steps` cycles, so `Termination`
 needs only the cycle bound. -/
 theorem unfinished_cycles (hash : Hash) (image : Image) :
@@ -233,5 +262,9 @@ private def check (label : String) (condition : Bool) : IO Unit :=
 /-- info: 'SigGolf.Certificate' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms SigGolf.Certificate
+
+/-- info: 'SigGolf.Rules.Certificate' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms SigGolf.Rules.Certificate
 
 end SigGolf.Tests

@@ -96,6 +96,25 @@ class PolicyTests(unittest.TestCase):
         value = check(self.root)
         self.assertTrue(value['ok'], value['errors'])
 
+    def test_hardware_tracks_declare_a_known_hash(self):
+        value = check(self.root, 'constrained')
+        self.assertFalse(value['ok'])
+        self.assertIn('S, W, K, C, layout, and hash', value['errors'][0])
+        self.claim['hash'] = 'sha3'
+        self.write_claim()
+        value = check(self.root, 'laptop')
+        self.assertFalse(value['ok'])
+        self.assertIn('hash must be blake2s or sha256', value['errors'][0])
+        self.claim['hash'] = 'sha256'
+        self.write_claim()
+        (self.root / 'SigGolfCandidate' / 'Helper.lean').write_text('import SigGolf.Tracks\n')
+        value = check(self.root, 'constrained')
+        self.assertTrue(value['ok'], value['errors'])
+        self.assertEqual(value['score'], 800)
+        value = check(self.root)
+        self.assertFalse(value['ok'])
+        self.assertIn('exactly S, W, K, C, and layout', value['errors'][0])
+
     def test_custom_layout_is_accepted(self):
         self.claim['layout'] = {'message': 0x40000, 'secret_key': 0x40100,
                                 'public_key': 0x40200, 'cache': 0x80000,
