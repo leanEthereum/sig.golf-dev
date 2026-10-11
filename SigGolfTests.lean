@@ -26,6 +26,29 @@ private def movedToy : Submission := { toy with layout := movedLayout }
 private def runSmall (image : Image) (state : MachineState := initialMachine) : Execution :=
   evalWithAnswerFn zeroHash (execute image 20 state)
 
+/-- `lui rd, upper`, `lbu rd, 0(rs)`, and `sb rs2, 0(rs1)`. -/
+private def lui (rd upper : Nat) : BitVec 32 := BitVec.ofNat 32 (upper * 2 ^ 12 + rd * 2 ^ 7 + 0x37)
+private def lbu (rd rs : Nat) : BitVec 32 := BitVec.ofNat 32 (rs * 2 ^ 15 + 4 * 2 ^ 12 + rd * 2 ^ 7 + 0x03)
+private def sb (rs1 rs2 : Nat) : BitVec 32 := BitVec.ofNat 32 (rs2 * 2 ^ 20 + rs1 * 2 ^ 15 + 0x23)
+private def halt : List (BitVec 32) := [addi 5 0 1, addi 10 0 0, 0x73]
+/-- Load or store one byte at `upper * 4096 + low`, then halt; 16 bytes of embedded data. -/
+private def loadAt (upper low : Nat) : Image := ⟨[lui 8 upper, addi 8 8 low, lbu 7 8] ++ halt, List.replicate 16 0⟩
+private def storeAt (upper low : Nat) : Image := ⟨[lui 8 upper, addi 8 8 low, sb 8 0] ++ halt, List.replicate 16 0⟩
+/-- HASH one block at address 0 into `upper * 4096`. -/
+private def hashInto (upper : Nat) : Image :=
+  ⟨[addi 10 0 0, addi 11 0 64, lui 12 upper, 0x73] ++ halt, []⟩
+
+/-- RAM buffers at the bottom, the cache at `0x20000`, outside the Nano S+'s 40 KiB of RAM. -/
+private def nanoSizes : Sizes := ⟨16, 16, 64⟩
+private def nanoLayout : Layout :=
+  { message := 0, secretKey := 0x20, publicKey := 0x40, signature := 0x60, witness := 0x80,
+    cache := 0x20000 }
+private def nano : Submission := ⟨nanoSizes, nanoLayout, fun _ => acceptImage⟩
+private def nanoRules := Device.rules .constrained
+private def runOn (program : Program) (image : Image) : Execution :=
+  evalWithAnswerFn zeroHash
+    (executeWith (nanoRules.access { nano with image := fun _ => image } program) image 20 initialMachine)
+
 -- Kernel-checked boundary cases, independent of the compiled evaluator.
 example : Query.blocks ⟨0, 0⟩ = 1 ∧ Query.blocks ⟨1, 0⟩ = 2 := by decide
 example : witnessCharge 0 = 0 ∧ witnessCharge 1 = 1 ∧ witnessCharge 256 = 1 ∧ witnessCharge 257 = 2 := by
@@ -50,28 +73,37 @@ example : ¬ (hashImage 128).Valid toySizes { movedLayout with publicKey := move
 example : ¬ ({ hashImage 128 with data := List.replicate 32 0 } : Image).Valid toySizes
     { standardLayout toySizes with witness := MEMORY_BYTES - 16 } := by decide
 example : toy.Admission := by decide
+example : nanoRules.Admission nano := by decide
+example : ¬ nanoRules.Admission { nano with layout := { nanoLayout with signature := 0x9ff8 } } := by
+  decide
+example : ¬ nanoRules.Admission toy := by decide
 
 -- Hardware tracks: each budget is the device's whole compressions in the allowed time.
-example : Device.compressions .constrained .blake2s SIGN_SECONDS = 66000 ∧
-    Device.compressions .constrained .blake2s KEYGEN_SECONDS = 1980000 ∧
-    Device.compressions .constrained .sha256 SIGN_SECONDS = 50000 ∧
-    Device.compressions .constrained .sha256 KEYGEN_SECONDS = 1500000 ∧
-    Device.compressions .laptop .blake2s SIGN_SECONDS = 500000000 ∧
-    Device.compressions .laptop .blake2s KEYGEN_SECONDS = 15000000000 ∧
-    Device.compressions .laptop .sha256 SIGN_SECONDS = 378787878 ∧
-    Device.compressions .laptop .sha256 KEYGEN_SECONDS = 11363636363 := by decide
-example (hash : HashFunction) :
-    (Device.rules .constrained hash).lifetime = 2 ^ 16 ∧
-    (Device.rules .laptop hash).lifetime = 2 ^ 32 ∧
-    (Device.rules .constrained hash).cycleLimit = 2 ^ 32 ∧
-    (Device.rules .laptop hash).cycleLimit = 2 ^ 40 ∧
-    (Device.rules .constrained hash).expandBudget = 2 ^ 20 ∧
-    (Device.rules .laptop hash).expandBudget = 2 ^ 20 := by
-  cases hash <;> decide
--- Each track's cycle limit holds its keygen budget at 8 cycles per compression.
-example : 8 * Device.compressions .laptop .blake2s KEYGEN_SECONDS < LAPTOP_CYCLE_LIMIT ∧
-    8 * Device.compressions .constrained .blake2s KEYGEN_SECONDS < CYCLE_LIMIT := by decide
+example : (Device.rules .constrained).signBudget = 66000 ∧
+    (Device.rules .constrained).keygenBudget = 1980000 ∧
+    (Device.rules .laptop).signBudget = 1250000000 ∧
+    (Device.rules .laptop).keygenBudget = 37500000000 := by decide
+example : (Device.rules .constrained).lifetime = 2 ^ 16 ∧
+    (Device.rules .laptop).lifetime = 2 ^ 32 ∧
+    (Device.rules .constrained).expandBudget = 2 ^ 20 ∧
+    (Device.rules .laptop).expandBudget = 2 ^ 20 ∧
+    (Device.rules .constrained).cycleLimit .keygen = 3780000000 ∧
+    (Device.rules .constrained).cycleLimit .sign = 126000000 ∧
+    (Device.rules .laptop).cycleLimit .keygen = 2 ^ 40 ∧
+    (Device.rules .laptop).cycleLimit .sign = 2 ^ 40 := by decide
+-- `expand` and `verify` keep `full`'s cycle limit on every track.
+example (device : Device) :
+    (Device.rules device).cycleLimit .expand = CYCLE_LIMIT ∧
+    (Device.rules device).cycleLimit .verify = CYCLE_LIMIT := by
+  cases device <;> exact ⟨rfl, rfl⟩
+-- Each budget fits its cycle limit at 8 cycles per compression.
+example : 8 * Device.compressions .laptop KEYGEN_SECONDS < LAPTOP_CYCLE_LIMIT ∧
+    8 * Device.compressions .laptop SIGN_SECONDS < LAPTOP_CYCLE_LIMIT ∧
+    8 * Device.compressions .constrained KEYGEN_SECONDS < KEYGEN_SECONDS * NANO_HZ ∧
+    8 * Device.compressions .constrained SIGN_SECONDS < SIGN_SECONDS * NANO_HZ ∧
+    KEYGEN_SECONDS * NANO_HZ < CYCLE_LIMIT := by decide
 -- Under `Rules.full` the restatement is the original contract.
+example : Riscv.executeWith none = Riscv.execute := rfl
 example : Rules.full.budget = Program.budget := by funext program; cases program <;> rfl
 example : Rules.run Rules.full = @Submission.run := rfl
 example : Rules.honest Rules.full = Submission.honest := rfl
@@ -257,6 +289,22 @@ private def check (label : String) (condition : Bool) : IO Unit :=
   let outputState := initialMachine.writeBytesAsWords (BitVec.ofNat 64 movedLayout.signature) [0x5a]
   let output : BitVec 8 := readOutput movedToy.sizes movedToy.layout .sign outputState
   check "custom output offset" (output == 0x5a)
+  -- The Nano S+ memory: keygen and sign only.
+  check "keygen and sign are confined, expand and verify are not"
+    ((nanoRules.access nano .keygen).isSome && (nanoRules.access nano .sign).isSome &&
+      (nanoRules.access nano .expand).isNone && (nanoRules.access nano .verify).isNone &&
+      (Rules.full.access nano .sign).isNone)
+  check "RAM is read and written" ((runOn .sign (storeAt 9 4095)).exit == Exit.success &&
+    (runOn .sign (loadAt 9 4095)).exit == Exit.success)
+  check "memory past RAM is not" ((runOn .sign (storeAt 10 0)).exit == Exit.failure &&
+    (runOn .keygen (loadAt 10 0)).exit == Exit.failure)
+  check "verify is not confined" ((runOn .verify (storeAt 10 0)).exit == Exit.success)
+  check "sign reads the cache, only keygen writes it" ((runOn .sign (loadAt 0x20 0)).exit == Exit.success &&
+    (runOn .sign (storeAt 0x20 0)).exit == Exit.failure && (runOn .keygen (storeAt 0x20 0)).exit == Exit.success)
+  check "embedded data is read only" ((runOn .sign (loadAt 0x1000 4080)).exit == Exit.success &&
+    (runOn .sign (storeAt 0x1000 4080)).exit == Exit.failure)
+  check "HASH answers land in RAM" ((runOn .sign (hashInto 9)).exit == Exit.success &&
+    (runOn .sign (hashInto 10)).exit == Exit.failure && (runOn .sign (hashInto 10)).compressions == 0)
   IO.println "RISC-V and security regressions passed."
 
 /-- info: 'SigGolf.Certificate' depends on axioms: [propext, Classical.choice, Quot.sound] -/

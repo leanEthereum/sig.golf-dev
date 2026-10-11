@@ -2,12 +2,96 @@ import SigGolf.Statements
 
 /-! # Tracks
 
-The `constrained` and `laptop` tracks restate `Programs`, `Security`, and `Statements` under a
-track's `Rules`: its budgets, `lifetime`, and `cycleLimit` replace `BUDGET_KEYGEN`, `BUDGET_SIGN`,
-`BUDGET_EXPAND`, `LIFETIME`, and `CYCLE_LIMIT`. Each definition copies the original of the same
-name and changes only those constants, so under `Rules.full` it unfolds to the original, which
-`SigGolfTests` checks. A hardware-track certificate is
-`(Device.rules device hash).Certificate submission C`. -/
+The `constrained` and `laptop` tracks restate `Riscv.execute`, `Programs`, `Security`, and
+`Statements` under a track's `Rules`: its budgets, `lifetime`, and per-program `cycleLimit` replace
+`BUDGET_KEYGEN`, `BUDGET_SIGN`, `BUDGET_EXPAND`, `LIFETIME`, and `CYCLE_LIMIT`, and its device
+`memory`, if any, restricts the addresses keygen and sign access and adds a device admission.
+Each definition copies the original of the same name and changes only those, so under
+`Rules.full` it unfolds to the original, which `SigGolfTests` checks. A hardware-track certificate
+is `(Device.rules device).Certificate submission C`. -/
+
+namespace SigGolf.Riscv
+open RiscvZkvm.Rv64 OracleComp
+
+/-- The accesses a track allows, as `allows address bytes isStore`, on top of the bounds and
+alignment every access needs; `none` allows them all. -/
+abbrev Access := Option (Nat → Nat → Bool → Bool)
+
+/-- `ordinaryStep`, failing on a load or store `allows` forbids. -/
+def confinedStep (allows : Nat → Nat → Bool → Bool) (state : MachineState) :
+    Instruction → Option MachineState
+  | .base base =>
+      match memAccess state base with
+      | some (address, width, isStore) =>
+          if allows address.toNat width isStore then ordinaryStep state (.base base) else none
+      | none => ordinaryStep state (.base base)
+  | instruction => ordinaryStep state instruction
+
+/-- `hashArgumentsValid`, also asking `allows` to read the input and write the answer. -/
+def confinedHashArguments (allows : Nat → Nat → Bool → Bool) (state : MachineState) : Bool :=
+  hashArgumentsValid state &&
+    allows (state.getReg .x10).toNat (state.getReg .x11).toNat false &&
+    allows (state.getReg .x12).toNat 32 true
+
+/-- `execute`, with `allows` checked at every load, store, and HASH. -/
+def executeConfined (allows : Nat → Nat → Bool → Bool) (image : Image) :
+    Nat → MachineState → OracleComp HashSpec Execution
+  | 0, state => pure { exit := .unfinished, state := state, cycles := 0, compressions := 0 }
+  | steps + 1, state =>
+    match fetch image state with
+    | none => pure { exit := .failure, state := state, cycles := 0, compressions := 0 }
+    | some (.base .ECALL) =>
+      if state.getReg .x5 = 0 && confinedHashArguments allows state then do
+        let input := hashInput state
+        let answer ← HashSpec.query input
+        let result ← executeConfined allows image steps (writeHash state answer)
+        return result.charge (8 * input.blocks) input.blocks
+      else if state.getReg .x5 = 1 then
+        pure { exit := if state.getReg .x10 = 0 then .success else .failure, state := state,
+               cycles := 1, compressions := 0 }
+      else pure { exit := .failure, state := state, cycles := 1, compressions := 0 }
+    | some instruction =>
+      match confinedStep allows state instruction with
+      | none => pure { exit := .failure, state := state, cycles := 1, compressions := 0 }
+      | some next => do
+          let result ← executeConfined allows image steps next
+          return result.charge (instructionCycles instruction) 0
+
+/-- `execute` itself when `access` allows everything. -/
+def executeWith : Access → Image → Nat → MachineState → OracleComp HashSpec Execution
+  | none => execute
+  | some allows => executeConfined allows
+
+end SigGolf.Riscv
+
+namespace SigGolf
+
+/-! ### Device memory -/
+
+/-- What `program` may access on the device: RAM, read and written; the cache, which lives in
+flash and only keygen writes; and the image's embedded data, flash, read only. -/
+def DeviceMemory.allows (memory : DeviceMemory) (submission : Submission) (program : Program)
+    (address bytes : Nat) (isStore : Bool) : Bool :=
+  let cache := submission.layout.cache
+  decide (address + bytes ≤ memory.ramBytes) ||
+    (decide (cache ≤ address ∧ address + bytes ≤ cache + submission.sizes.cache) &&
+      (!isStore || decide (program = .keygen))) ||
+    (!isStore && decide (Riscv.dataBase (submission.image program) ≤ address))
+
+/-- Keygen and sign fit in the device's flash with the cache, and the buffers they read and
+write lie in its RAM. -/
+def DeviceMemory.Fits (memory : DeviceMemory) (submission : Submission) : Prop :=
+  (submission.image .keygen).byteSize + (submission.image .sign).byteSize +
+      submission.sizes.cache ≤ memory.flashBytes ∧
+    submission.layout.message + 32 ≤ memory.ramBytes ∧
+    submission.layout.secretKey + 32 ≤ memory.ramBytes ∧
+    submission.layout.publicKey + 16 ≤ memory.ramBytes ∧
+    submission.layout.signature + submission.sizes.signature ≤ memory.ramBytes
+
+instance (memory : DeviceMemory) (submission : Submission) : Decidable (memory.Fits submission) := by
+  unfold DeviceMemory.Fits; infer_instance
+
+end SigGolf
 
 namespace SigGolf.Rules
 open OracleComp OracleSpec OracleComp.EvalDist
@@ -16,11 +100,19 @@ variable (rules : Rules)
 
 /-! ### Programs -/
 
-/-- `Submission.run`, cut off after `rules.cycleLimit` instructions. -/
+/-- On a device, keygen and sign are confined to its memory; other programs are not. -/
+def access (submission : Submission) (program : Program) : Riscv.Access :=
+  match rules.memory with
+  | none => none
+  | some memory =>
+      if program = .keygen ∨ program = .sign then some (memory.allows submission program) else none
+
+/-- `Submission.run`, confined by `access` and cut off after `rules.cycleLimit program`
+instructions. -/
 def run (submission : Submission) (program : Program) (input : Input submission.sizes program) :
     OracleComp HashSpec (RunResult (Output submission.sizes program)) := do
-  let execution ←
-    Riscv.execute (submission.image program) rules.cycleLimit (initialState submission program input)
+  let execution ← Riscv.executeWith (rules.access submission program) (submission.image program)
+    (rules.cycleLimit program) (initialState submission program input)
   let output := readOutput submission.sizes submission.layout program execution.state
   return ⟨if execution.exit = .success then some output else none,
     execution.cycles, execution.compressions⟩
@@ -108,6 +200,15 @@ def securityExperiment (submission : Submission) (adversary : Adversary submissi
 
 /-! ### Statements -/
 
+/-- `Submission.Admission`, and on a device, `DeviceMemory.Fits`. -/
+def Admission (submission : Submission) : Prop :=
+  match rules.memory with
+  | none => submission.Admission
+  | some memory => submission.Admission ∧ memory.Fits submission
+
+instance (submission : Submission) : Decidable (rules.Admission submission) := by
+  unfold Rules.Admission; split <;> infer_instance
+
 def Completeness (submission : Submission) : Prop :=
   ∀ secretKey,
     1 - FAILURE ≤ Pr[= true | withRandomOracle (rules.everyMessageSucceeds submission secretKey)]
@@ -131,11 +232,11 @@ def Security (submission : Submission) : Prop :=
 
 def Termination (submission : Submission) : Prop :=
   ∀ (hash : Hash) (program : Program) (input : Input submission.sizes program),
-    (evalWithAnswerFn hash (rules.run submission program input)).cycles < rules.cycleLimit
+    (evalWithAnswerFn hash (rules.run submission program input)).cycles < rules.cycleLimit program
 
 /-- The claim on a track: the score is `S × C`, as on `full`. -/
 structure Certificate (submission : Submission) (C : Nat) : Prop where
-  admission : submission.Admission
+  admission : rules.Admission submission
   completeness : rules.Completeness submission
   compressionBudgets : rules.CompressionBudgets submission
   verificationCycles : rules.VerificationCycles submission C

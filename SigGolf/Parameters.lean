@@ -96,51 +96,61 @@ def witnessCharge (bytes : Nat) : Nat := (bytes + 255) / 256
 
 `Statements` uses the constants above, the `full` track's. The `constrained` and `laptop` tracks
 price keygen and sign on a device instead: a budget is the compressions the device completes in
-`KEYGEN_SECONDS` or `SIGN_SECONDS` with the hash function the submission declares for `H`. -/
+`KEYGEN_SECONDS` or `SIGN_SECONDS`. As on `full`, `H` is an unnamed random oracle. -/
 
 def KEYGEN_SECONDS : Nat := 60
 def SIGN_SECONDS : Nat := 2
 
-/-- The hash function a hardware-track submission declares for `H`; only budgets depend on it. -/
-inductive HashFunction where
-  | blake2s | sha256
-  deriving DecidableEq
-
 inductive Device where
-  /-- A Ledger Nano S+-class secure element (ST33). -/
+  /-- A Ledger Nano S+: an ST33K1M5 secure element, a Cortex-M35P at 63 MHz. -/
   | constrained
-  /-- A laptop CPU. -/
+  /-- A laptop CPU with SHA-256 instructions (Intel SHA-NI, ARMv8 SHA2). -/
   | laptop
   deriving DecidableEq
 
-/-- Compressions per second as `(numerator, denominator)`. The laptop's SHA-256 rate keeps the
-secure element's SHA-256 to BLAKE2s ratio, 25 : 33. -/
-def Device.rate : Device → HashFunction → Nat × Nat
-  | .constrained, .blake2s => (33000, 1)
-  | .constrained, .sha256 => (25000, 1)
-  | .laptop, .blake2s => (250000000, 1)
-  | .laptop, .sha256 => (250000000 * 25, 33)
+/-- Compressions per second with the device's fastest hash. The secure element has no hash
+hardware, and BLAKE2s is fastest in software; the laptop's SHA-256 instructions make the SHA-256
+compression function 5/2 times faster than BLAKE2s, at 250,000,000. -/
+def Device.rate : Device → Nat
+  | .constrained => 33000
+  | .laptop => 625000000
 
-/-- Whole compressions in `seconds`, rounded down. -/
-def Device.compressions (device : Device) (hash : HashFunction) (seconds : Nat) : Nat :=
-  seconds * (device.rate hash).1 / (device.rate hash).2
+/-- Whole compressions in `seconds`. -/
+def Device.compressions (device : Device) (seconds : Nat) : Nat :=
+  seconds * device.rate
+
+/-- An app's SRAM on the Nano S+, from the Ledger SDK's `nanos2` linker script. -/
+def NANO_RAM_BYTES : Nat := 40 * 1024
+
+/-- An app's flash on the Nano S+, code and data, from the same linker script. -/
+def NANO_FLASH_BYTES : Nat := 400 * 1024
+
+/-- The Nano S+ clock: keygen and sign run at most this many cycles per second. -/
+def NANO_HZ : Nat := 63000000
 
 /-- Signing requests on the `constrained` track: fewer signatures for cheaper keygen and signing,
 the trade hypertree pruning makes. -/
 def CONSTRAINED_LIFETIME : Nat := 2 ^ 16
 
-/-- The `laptop` track's cycle limit, high enough for its keygen budget at 8 cycles per
-compression. -/
+/-- The `laptop` track's cycle limit for keygen and sign, high enough for its keygen budget at 8
+cycles per compression. -/
 def LAPTOP_CYCLE_LIMIT : Nat := 2 ^ 40
 
+/-- The memory keygen and sign may use on a device: RAM is the addresses below `ramBytes`, and
+`flashBytes` holds both programs and the cache. -/
+structure DeviceMemory where
+  ramBytes : Nat
+  flashBytes : Nat
+
 /-- What a track fixes: the honest budgets in compressions, the signing requests the adversary may
-make, and the cycle limit. -/
+make, each program's cycle limit, and the device memory keygen and sign run in, if any. -/
 structure Rules where
   keygenBudget : Nat
   signBudget : Nat
   expandBudget : Nat
   lifetime : Nat
-  cycleLimit : Nat
+  cycleLimit : Program → Nat
+  memory : Option DeviceMemory
 
 /-- `Program.budget` under `rules`. -/
 def Rules.budget (rules : Rules) : Program → Option Nat
@@ -149,18 +159,25 @@ def Rules.budget (rules : Rules) : Program → Option Nat
   | .expand => some rules.expandBudget
   | .verify => none
 
-def Rules.full : Rules := ⟨BUDGET_KEYGEN, BUDGET_SIGN, BUDGET_EXPAND, LIFETIME, CYCLE_LIMIT⟩
+def Rules.full : Rules :=
+  ⟨BUDGET_KEYGEN, BUDGET_SIGN, BUDGET_EXPAND, LIFETIME, fun _ => CYCLE_LIMIT, none⟩
 
-/-- A hardware track for the declared hash; `expand` keeps `BUDGET_EXPAND`. -/
-def Device.rules (device : Device) (hash : HashFunction) : Rules where
-  keygenBudget := device.compressions hash KEYGEN_SECONDS
-  signBudget := device.compressions hash SIGN_SECONDS
+/-- A hardware track. `expand` and `verify` keep `full`'s budget and cycle limit: they run on
+the verifier's side, not on the device. -/
+def Device.rules (device : Device) : Rules where
+  keygenBudget := device.compressions KEYGEN_SECONDS
+  signBudget := device.compressions SIGN_SECONDS
   expandBudget := BUDGET_EXPAND
   lifetime := match device with
     | .constrained => CONSTRAINED_LIFETIME
     | .laptop => LIFETIME
-  cycleLimit := match device with
-    | .constrained => CYCLE_LIMIT
-    | .laptop => LAPTOP_CYCLE_LIMIT
+  cycleLimit program := match device, program with
+    | .constrained, .keygen => KEYGEN_SECONDS * NANO_HZ
+    | .constrained, .sign => SIGN_SECONDS * NANO_HZ
+    | .laptop, .keygen | .laptop, .sign => LAPTOP_CYCLE_LIMIT
+    | _, .expand | _, .verify => CYCLE_LIMIT
+  memory := match device with
+    | .constrained => some ⟨NANO_RAM_BYTES, NANO_FLASH_BYTES⟩
+    | .laptop => none
 
 end SigGolf

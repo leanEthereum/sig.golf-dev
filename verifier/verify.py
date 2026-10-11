@@ -208,11 +208,11 @@ def verify(args: argparse.Namespace) -> dict:
         challenge = (args.trusted / 'verifier' / 'Challenge.lean.in').read_text()
         placeholders = {key: policy['claim'][key] for key in ('S', 'W', 'K', 'C')}
         placeholders.update({key.upper(): value for key, value in policy['claim']['layout'].items()})
-        # The policy check admitted only a known track and, on hardware tracks, a known hash.
+        # argparse admitted only a known track.
         if args.track == 'full':
             placeholders['CERTIFICATE'] = f"SigGolf.Certificate submission {policy['claim']['C']}"
         else:
-            placeholders['CERTIFICATE'] = (f"(SigGolf.Device.rules .{args.track} .{policy['claim']['hash']})"
+            placeholders['CERTIFICATE'] = (f"(SigGolf.Device.rules .{args.track})"
                                            f".Certificate submission {policy['claim']['C']}")
         for key, value in placeholders.items():
             challenge = challenge.replace('{{' + key + '}}', str(value))

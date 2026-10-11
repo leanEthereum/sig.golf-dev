@@ -15,7 +15,6 @@ INTEGER = re.compile(r"0|[1-9][0-9]*")
 MEMORY_BYTES = 1 << 24
 CLAIM_KEYS = {"S", "W", "K", "C", "layout"}
 TRACKS = ("full", "constrained", "laptop")
-HASHES = ("blake2s", "sha256")
 LAYOUT_KEYS = ("message", "secret_key", "public_key", "cache", "signature", "witness")
 ALLOWED_LIBRARIES = ("Mathlib", "ToMathlib", "VCVio", "RiscvZkvm", "Batteries", "Lean", "Init", "Std")
 ALLOWED_CONTRACT = {"SigGolf", "SigGolf.Parameters", "SigGolf.Oracle", "SigGolf.Riscv",
@@ -68,20 +67,13 @@ def imports(source: str) -> list[str]:
     return found
 
 
-def claim(path: Path, track: str = "full") -> dict[str, int | str | dict[str, int]]:
-    """The hardware tracks also declare the hash function H stands for."""
+def claim(path: Path) -> dict[str, int | dict[str, int]]:
     raw = path.read_bytes()
     if len(raw) > 512:
         raise ValueError("claim.json exceeds 512 bytes")
     value = json.loads(raw)
-    if track == "full":
-        if not isinstance(value, dict) or set(value) != CLAIM_KEYS:
-            raise ValueError("claim.json must contain exactly S, W, K, C, and layout")
-    else:
-        if not isinstance(value, dict) or set(value) != CLAIM_KEYS | {"hash"}:
-            raise ValueError("claim.json must contain exactly S, W, K, C, layout, and hash")
-        if value["hash"] not in HASHES:
-            raise ValueError("hash must be blake2s or sha256")
+    if not isinstance(value, dict) or set(value) != CLAIM_KEYS:
+        raise ValueError("claim.json must contain exactly S, W, K, C, and layout")
     if any(type(value[key]) is not int or not INTEGER.fullmatch(str(value[key]))
            for key in ("S", "W", "K", "C")):
         raise ValueError("S, W, K, and C must be nonnegative decimal integers")
@@ -144,7 +136,7 @@ def check(root: Path, track: str = "full") -> dict:
     if not (root / "Solution.lean").is_file():
         errors.append("Solution.lean is required")
     try:
-        values = claim(root / "claim.json", track)
+        values = claim(root / "claim.json")
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         values = None
         errors.append(f"invalid claim.json: {exc}")

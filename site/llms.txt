@@ -39,7 +39,7 @@ The only hash is the syscall HASH, a random oracle on inputs of 64·k bytes retu
 
 Memory faults, misaligned accesses, invalid HASH arguments, unknown syscalls, EBREAK, and HALT with a nonzero code fail the program at 1 cycle with no oracle call; an invalid fetch or encoding fails at 0 cycles. A failed verify is a rejection.
 
-Honest budgets, in 64-byte compressions: keygen 2^20, sign 2^17, expand 2^20. Verify has no budget; its cycles are the score. These are the `full` track's. This repository's `constrained` and `laptop` tracks instead allow 60 s of keygen and 2 s of signing on a Ledger Nano S+-class secure element or a laptop, at the declared hash's rate, with 2^16 or 2^32 signing requests and a cycle limit of 2^32 or 2^40; see the Tracks section of RULES.md.
+Honest budgets, in 64-byte compressions: keygen 2^20, sign 2^17, expand 2^20. Verify has no budget; its cycles are the score. These are the `full` track's. This repository's `constrained` and `laptop` tracks instead allow 60 s of keygen and 2 s of signing on a Ledger Nano S+ or a laptop, at the device's fastest compression rate (H stays an unnamed random oracle), with 2^16 or 2^32 signing requests. Expand and verify keep the 2^32 cycle limit; keygen and sign get the Nano S+ clock (63 MHz × the time limit) or 2^40. On `constrained`, keygen and sign may only use the Nano S+'s 40 KiB of RAM (addresses below 40,960, which must hold the message, keys, and signature), the cache (written by keygen only), and read-only embedded data, and the two images plus the cache fit in 400 KiB of flash; see the Tracks section of RULES.md.
 
 ## What the certificate proves
 
@@ -97,7 +97,7 @@ presentation/scheme.svg         optional, only with "diagram": true
             "signature": 131168, "witness": 139024}}
 ```
 
-On the `constrained` and `laptop` tracks, the claim adds `"hash": "blake2s"` or `"sha256"`, and the certificate is `(SigGolf.Device.rules .constrained .blake2s).Certificate submission 5000000` with that track and hash.
+On the `constrained` and `laptop` tracks, the claim is the same, and the certificate is `(SigGolf.Device.rules .constrained).Certificate submission 5000000` with that track.
 
 `Solution.lean` must define and prove exactly this, with the same numbers as `claim.json`. The verifier generates its own `SigGolf.Challenge` with these statements and `sorry`, then compares yours against it, so do not import `SigGolf.Challenge`:
 
