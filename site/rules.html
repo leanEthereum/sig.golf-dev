@@ -36,6 +36,7 @@
       <nav class="rules-toc" aria-label="Rules sections">
         <a href="#submission">Submission</a>
         <a href="#parameters">Parameters</a>
+        <a href="#tracks">Tracks</a>
         <a href="#programs">Programs</a>
         <a href="#model">Model and costs</a>
         <a href="#proofs">Required proofs</a>
@@ -54,21 +55,21 @@
             <li><a href="#memory-layout">Six byte offsets</a> specifying where RISC-V inputs and outputs reside in memory.</li>
             <li>Lean 4 proofs for every <a href="#proofs">required statement</a>.</li>
           </ul>
-          <p>Goal: minimize <code>S × C</code>.</p>
+          <p>Goal: minimize <code>S × C</code>. Three <a href="#tracks">tracks</a> set different keygen and signing budgets and lifetimes.</p>
         </section>
 
         <section id="parameters" class="rule-section">
           <h2>Parameters</h2>
           <div class="table-grid">
-            <div class="rule-table-wrap constants-table"><table><thead><tr><th>Constant</th><th>Value</th><th>Meaning</th></tr></thead><tbody>
-              <tr><td><math class="rule-math" aria-label="B sub keygen" title="BUDGET_KEYGEN"><msub><mi>B</mi><mtext>keygen</mtext></msub></math></td><td>2<sup>20</sup></td><td>Keygen compression budget</td></tr>
-              <tr><td><math class="rule-math" aria-label="B sub sign" title="BUDGET_SIGN"><msub><mi>B</mi><mtext>sign</mtext></msub></math></td><td>2<sup>17</sup></td><td>Signing compression budget</td></tr>
-              <tr><td><math class="rule-math" aria-label="B sub expand" title="BUDGET_EXPAND"><msub><mi>B</mi><mtext>expand</mtext></msub></math></td><td>2<sup>20</sup></td><td>Expansion compression budget</td></tr>
-              <tr><td><math class="rule-math" aria-label="epsilon, failure bound" title="FAILURE"><mi>ε</mi></math></td><td>2<sup>−128</sup></td><td>Honest failure probability</td></tr>
-              <tr id="parameter-lifetime"><td><math class="rule-math" aria-label="L, signing lifetime" title="LIFETIME"><mi>L</mi></math></td><td>2<sup>32</sup></td><td>Signing lifetime</td></tr>
-              <tr><td><math class="rule-math" aria-label="lambda, security bits" title="SECURITY_BITS"><mi>λ</mi></math></td><td>127</td><td>Security level in bits</td></tr>
-              <tr id="parameter-cycle-limit"><td><math class="rule-math" aria-label="T, cycle limit" title="CYCLE_LIMIT"><mi>T</mi></math></td><td>2<sup>32</sup></td><td>Program cycle limit</td></tr>
-              <tr><td><math class="rule-math" aria-label="P max, program size limit" title="MAX_PROGRAM_BYTES"><msub><mi>P</mi><mtext>max</mtext></msub></math></td><td>2<sup>20</sup></td><td>Program size limit (bytes)</td></tr>
+            <div class="rule-table-wrap constants-table"><table><thead><tr><th>Constant</th><th><code>full</code></th><th><code>constrained</code></th><th><code>laptop</code></th><th>Meaning</th></tr></thead><tbody>
+              <tr><td><math class="rule-math" aria-label="B sub keygen" title="BUDGET_KEYGEN"><msub><mi>B</mi><mtext>keygen</mtext></msub></math></td><td>2<sup>20</sup></td><td>2<sup>20</sup></td><td>2<sup>31</sup></td><td>Keygen compression budget</td></tr>
+              <tr><td><math class="rule-math" aria-label="B sub sign" title="BUDGET_SIGN"><msub><mi>B</mi><mtext>sign</mtext></msub></math></td><td>2<sup>17</sup></td><td>2<sup>15</sup></td><td>2<sup>26</sup></td><td>Signing compression budget</td></tr>
+              <tr><td><math class="rule-math" aria-label="B sub expand" title="BUDGET_EXPAND"><msub><mi>B</mi><mtext>expand</mtext></msub></math></td><td>2<sup>20</sup></td><td>2<sup>20</sup></td><td>2<sup>20</sup></td><td>Expansion compression budget</td></tr>
+              <tr id="parameter-lifetime"><td><math class="rule-math" aria-label="L, signing lifetime" title="LIFETIME"><mi>L</mi></math></td><td>2<sup>32</sup></td><td>2<sup>16</sup></td><td>2<sup>32</sup></td><td>Signing lifetime</td></tr>
+              <tr id="parameter-cycle-limit"><td><math class="rule-math" aria-label="T, cycle limit" title="CYCLE_LIMIT"><mi>T</mi></math></td><td>2<sup>32</sup></td><td colspan="2">2<sup>32</sup>, see <a href="#track-cycle-limits">Tracks</a></td><td>Program cycle limit</td></tr>
+              <tr><td><math class="rule-math" aria-label="epsilon, failure bound" title="FAILURE"><mi>ε</mi></math></td><td colspan="3">2<sup>−128</sup></td><td>Honest failure probability</td></tr>
+              <tr><td><math class="rule-math" aria-label="lambda, security bits" title="SECURITY_BITS"><mi>λ</mi></math></td><td colspan="3">127</td><td>Security level in bits</td></tr>
+              <tr><td><math class="rule-math" aria-label="P max, program size limit" title="MAX_PROGRAM_BYTES"><msub><mi>P</mi><mtext>max</mtext></msub></math></td><td colspan="3">2<sup>20</sup></td><td>Program size limit (bytes)</td></tr>
             </tbody></table></div>
             <div class="rule-table-wrap"><table><thead><tr><th>Object</th><th>Size (in Bytes)</th></tr></thead><tbody>
               <tr><td>Message</td><td>32</td></tr>
@@ -79,6 +80,36 @@
               <tr><td>Witness</td><td><a href="#score-w"><code>W</code></a> (maximum 128 KiB)</td></tr>
             </tbody></table></div>
           </div>
+        </section>
+
+        <section id="tracks" class="rule-section">
+          <h2>Tracks</h2>
+          <p>Every track scores <code>S × C</code> with the same programs, model, and statements, and <a href="#oracle-definition"><code>H</code></a> is an unnamed random oracle on every track. <code>full</code> sets its budgets in compressions. The hardware tracks budget keygen and signing by what a device hashes in 60 s and 2 s, rounded to powers of two, to find the schemes best suited to keygen and signing on hardware:</p>
+          <div class="rule-table-wrap"><table><thead><tr><th>Track</th><th>Device</th><th>Compressions per second</th><th>Signing budget</th><th>Keygen budget</th></tr></thead><tbody>
+            <tr><td><code>constrained</code></td><td>Ledger Nano S+: ST33K1M5 secure element, Cortex-M35P, 63 MHz</td><td>≈ 18,500</td><td>2<sup>15</sup> (1.8 s)</td><td>2<sup>20</sup> (57 s)</td></tr>
+            <tr><td><code>laptop</code></td><td>One laptop core</td><td>≈ 2<sup>25</sup></td><td>2<sup>26</sup> (2 s)</td><td>2<sup>31</sup> (64 s)</td></tr>
+          </tbody></table></div>
+          <dl class="detail-list">
+            <div><dt>Nano S+ rate</dt><dd>Blockstream's SLH-DSA-SHA2-128s app hashes SHA-256 inside the app and takes 15.82 s for keygen and 120.12 s for signing: about 292,000 and 2,218,000 compressions, both 18,480 per second. Hashing through the operating system's crypto calls is about 25 times slower; the budgets assume in-app hashing.</dd></div>
+            <div><dt>Laptop rate</dt><dd>Independent one-block compressions on one core run at 2<sup>24.3</sup> per second with SHA-NI on an Intel Core Ultra 7 155H (8-lane AVX2 BLAKE2s: 2<sup>24.1</sup>) and about 2<sup>25.4</sup> with the SHA-256 instructions of an Apple M2. One core keeps the budget independent of core counts.</dd></div>
+            <div><dt>Expectation</dt><dd>As on <code>full</code>, a budget bounds <math class="rule-math" aria-label="Expectation of two raised to N sub P divided by B sub P"><mi>𝔼</mi><mo>[</mo><msup><mn>2</mn><mrow><msub><mi>N</mi><mi>P</mi></msub><mo>/</mo><msub><mi>B</mi><mi>P</mi></msub></mrow></msup><mo>]</mo></math>, not every run, so a rare run may take longer. The time limits count computation only: transferring the signature to the host is not counted, and a device may split the work across requests.</dd></div>
+          </dl>
+          <h3 id="track-cycle-limits">Cycle limits</h3>
+          <p><a href="#expand"><code>expand</code></a> and <a href="#verify"><code>verify</code></a> run on the verifier's side, so they keep <code>full</code>'s expansion budget and cycle limit on every track. Keygen and sign get their own cycle limits:</p>
+          <div class="rule-table-wrap"><table><thead><tr><th>Program</th><th><code>constrained</code></th><th><code>laptop</code></th></tr></thead><tbody>
+            <tr><td><a href="#keygen"><code>keygen</code></a></td><td>2<sup>32</sup> (68 s at 63 MHz)</td><td>2<sup>40</sup></td></tr>
+            <tr><td><a href="#sign"><code>sign</code></a></td><td>2<sup>27</sup> (2.1 s at 63 MHz)</td><td>2<sup>40</sup></td></tr>
+          </tbody></table></div>
+          <p>On <code>constrained</code> they follow the device clock, so work besides hashing also fits the time limits; on <code>laptop</code>, 2<sup>40</sup> is far above the keygen budget at 8 cycles per compression.</p>
+          <h3 id="track-memory">Nano S+ memory</h3>
+          <p>On <code>constrained</code>, keygen and sign run in the memory a Nano S+ gives an app, from the Ledger SDK's <code>nanos2</code> linker script: 40 KiB of RAM and 400 KiB of flash.</p>
+          <dl class="detail-list">
+            <div><dt>RAM</dt><dd>Addresses below 40,960, read and written freely. The message, secret key, public key, and signature buffers must lie there. <code>sp</code> starts at the embedded data, outside RAM, so a program sets its own stack.</dd></div>
+            <div><dt>Flash</dt><dd>Holds the keygen and sign images and the cache: their <code>4 × instructions + embedded data bytes</code>, plus <a href="#score-k"><code>K</code></a>, are at most 409,600 bytes. Keygen writes the cache and sign only reads it; both only read their embedded data.</dd></div>
+            <div><dt>Other addresses</dt><dd>Any other load, store, or HASH input or output address fails the run, like an out-of-bounds access.</dd></div>
+          </dl>
+          <h3 id="track-overuse">Lifetime and overuse</h3>
+          <p>The constrained track's <a href="#parameter-lifetime">lifetime</a> is 2<sup>16</sup> signing requests. Wallets do not count signatures reliably, so security must degrade gracefully past it: with up to 2<sup>20</sup> requests, 16 times the lifetime, a forgery must still have probability at most <code>Q / 2<sup>96</sup></code>. The smaller lifetime lets a scheme trade signatures for cheaper keygen and signing, for example by <a href="https://conduition.io/cryptography/hypertree-pruning/">hypertree pruning</a>: the signer replaces most hypertree leaves with cheap surrogate hashes and grinds its randomizer until the message lands on a kept leaf. Keeping a fraction <code>f</code> of the few-time-signature leaves multiplies the safe number of signatures by <code>f</code>, and grinding costs about <code>1/f</code> compressions per signature, charged to the signing budget; verification is unchanged.</p>
         </section>
 
         <section id="programs" class="rule-section">
@@ -145,7 +176,7 @@
             <li><a href="#verify"><code>verify(message, public key, witness)</code></a> returns the verdict.</li>
           </ol>
           <p>Stop at the first failure. The experiment succeeds when all stages succeed and verification accepts.</p>
-          <p><math class="rule-math" aria-label="N sub P"><msub><mi>N</mi><mi>P</mi></msub></math> counts program <code>P</code>'s compressions; it is zero if <code>P</code> is never reached. <math class="rule-math" aria-label="B sub P"><msub><mi>B</mi><mi>P</mi></msub></math> denotes <code>P</code>'s named budget.</p>
+          <p><math class="rule-math" aria-label="N sub P"><msub><mi>N</mi><mi>P</mi></msub></math> counts program <code>P</code>'s compressions; it is zero if <code>P</code> is never reached. <math class="rule-math" aria-label="B sub P"><msub><mi>B</mi><mi>P</mi></msub></math> denotes <code>P</code>'s budget on the submission's <a href="#tracks">track</a>.</p>
           <ol class="claim-list">
             <!-- Lean statement link: update it if the repository, the branch, or the line numbers in SigGolf/Statements.lean change. -->
             <li><b>Completeness<a class="lean-ref" href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Statements.lean#L21-L24">Lean statement</a></b><span>For every secret key, <math class="rule-math" aria-label="Probability over H that the experiment succeeds for every message is at least one minus epsilon"><msub><mi>Pr</mi><mi>H</mi></msub><mo>[</mo><mtext>success for every message</mtext><mo>]</mo><mo>≥</mo><mn>1</mn><mo>−</mo><mi>ε</mi></math>.</span></li>
@@ -187,7 +218,7 @@
           </ol>
           <p>The total hash-call count includes key generation, signing, <code>A</code>'s queries, and final expansion and verification when performed.</p>
           <!-- Lean statement link: update it if the repository, the branch, or the line numbers in SigGolf/Statements.lean change. -->
-          <div class="callout"><b>Security claim<a class="lean-ref" href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Statements.lean#L40-L45">Lean statement</a></b><span>For every <code>A</code> and <code>Q ≥ 1</code>, over the secret key, <code>H</code>, and <code>A</code>'s private randomness: <math class="rule-math" display="block" aria-label="Probability that A wins is at most Q divided by two to the power lambda"><mi>Pr</mi><mo>[</mo><mtext>A wins</mtext><mo>]</mo><mo>≤</mo><mfrac><mi>Q</mi><msup><mn>2</mn><mi>λ</mi></msup></mfrac></math></span></div>
+          <div class="callout"><b>Security claim<a class="lean-ref" href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Statements.lean#L40-L45">Lean statement</a></b><span>For every <code>A</code> and <code>Q ≥ 1</code>, over the secret key, <code>H</code>, and <code>A</code>'s private randomness: <math class="rule-math" display="block" aria-label="Probability that A wins is at most Q divided by two to the power lambda"><mi>Pr</mi><mo>[</mo><mtext>A wins</mtext><mo>]</mo><mo>≤</mo><mfrac><mi>Q</mi><msup><mn>2</mn><mi>λ</mi></msup></mfrac></math> On <code>constrained</code>, also <code>Pr[A wins] ≤ Q / 2<sup>96</sup></code> when <code>A</code> may make 2<sup>20</sup> signing requests (<a href="#track-overuse">overuse</a>).</span></div>
 
           <h3>Termination</h3>
           <!-- Lean statement link: update it if the repository, the branch, or the line numbers in SigGolf/Statements.lean change. -->
@@ -231,7 +262,7 @@
 
         <section id="project" class="rule-section">
           <h2>Lean project</h2>
-          <p><a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Statements.lean#L53-L60"><code>SigGolf.Certificate submission C</code></a> in <a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Statements.lean">SigGolf/Statements.lean</a> is the competition claim for the exact four program images and declared sizes. Besides the five statements above, it contains <a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Statements.lean#L12-L16"><code>Admission</code></a>: the size maxima, the program size limit, and the buffer layout rules. <a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Security.lean">SigGolf/Security.lean</a> defines the attacker and both forgery experiments; <a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Riscv.lean">SigGolf/Riscv.lean</a> defines execution and costs. In Lean, the adversary is an <code>OracleComp</code> over coins, <code>H</code>, and the signing oracle: a computation that makes finitely many queries and then submits a forgery or gives up. A strategy that could run for ever is represented by its truncations, which give up where they are cut. Giving up never wins, and such a strategy's win probability is the limit of its truncations', so the bound over all adversaries bounds every adaptive strategy.</p>
+          <p><a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Statements.lean#L53-L60"><code>SigGolf.Certificate submission C</code></a> in <a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Statements.lean">SigGolf/Statements.lean</a> is the <code>full</code> track's claim for the exact four program images and declared sizes. Besides the five statements above, it contains <a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Statements.lean#L12-L16"><code>Admission</code></a>: the size maxima, the program size limit, and the buffer layout rules. <a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Tracks.lean">SigGolf/Tracks.lean</a> restates execution, the programs, the game, and the statements under a track's constants and device memory, and adds the memory rules to <code>Admission</code>: a hardware-track claim is <code>(Device.rules device).Certificate submission C</code>, and <code>SigGolfTests</code> checks that the restatement under <code>full</code>'s constants is the original. <a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Security.lean">SigGolf/Security.lean</a> defines the attacker and both forgery experiments; <a href="https://github.com/leanEthereum/sig.golf-dev/blob/beta/SigGolf/Riscv.lean">SigGolf/Riscv.lean</a> defines execution and costs. In Lean, the adversary is an <code>OracleComp</code> over coins, <code>H</code>, and the signing oracle: a computation that makes finitely many queries and then submits a forgery or gives up. A strategy that could run for ever is represented by its truncations, which give up where they are cut. Giving up never wins, and such a strategy's win probability is the limit of its truncations', so the bound over all adversaries bounds every adaptive strategy.</p>
           <p>Build the statements and regression checks with <code>lake build SigGolf SigGolfTests</code>. Dependencies are pinned in <code>lake-manifest.json</code>. These files define the requirements; they do not certify a particular signature scheme. Submissions are verified from the <a href="https://github.com/leanEthereum/sig.golf-submissions">sig.golf-submissions</a> repository.</p>
         </section>
 
@@ -240,8 +271,9 @@
           <dl class="detail-list">
             <div><dt>Quantum security</dt><dd>The security game only considers classical adversaries. NIST level 1 requires ≈ 64 bits of security against quantum adversaries.</dd></div>
             <div><dt>Single-user security</dt><dd>The security game targets a single key, but a real attacker can target many users at once. The standard defense starts every hash with a per-key public parameter, so work against one user is useless against others. Drake's trick makes this cheap: a 16-byte parameter in the public key, padded with 48 zero bytes, fills the first 64-byte block of every hash, so its hash state is computed once and reused. Multi-user security then costs one compression and 16 bytes of public key.</dd></div>
-            <div><dt>MPC for threshold signing</dt><dd>The keygen and signing budgets let reasonably weak devices, such as hardware wallets, sign. Threshold signing runs keygen and sign inside multi-party computation (MPC), where hashing secret data costs far more. MPC precomputation followed by grinding on public values at signing can help (see <a href="https://github.com/RivaLabs-Core">RivaLabs</a>).</dd></div>
-            <div><dt>Trading lifetime for faster keygen and signing</dt><dd><a href="https://conduition.io/cryptography/hypertree-pruning/">Hypertree pruning</a> replaces most hypertree leaves with cheap placeholder hashes and grinds the randomizer until each message lands on a kept leaf, which speeds up keygen and signing without changing verification but lowers the safe number of signatures.</dd></div>
+            <div><dt>MPC for threshold signing</dt><dd>The <code>constrained</code> track's budgets let hardware wallets sign. Threshold signing runs keygen and sign inside multi-party computation (MPC), where hashing secret data costs far more. MPC precomputation followed by grinding on public values at signing can help (see <a href="https://github.com/RivaLabs-Core">RivaLabs</a>).</dd></div>
+            <div><dt>Device model</dt><dd>The hardware budgets count compressions at one measured rate per device, and on <code>constrained</code> the cycle limits and memory rules bound everything else; RISC-V instructions stand in for the device's own, and communication with the host is not modeled.</dd></div>
+            <div><dt>Fault attacks</dt><dd>A hardware wallet faces glitching, and one faulted signature can give a universal forgery against SPHINCS-like schemes (<a href="https://eprint.iacr.org/2018/102">Castelnovi, Martinelli, Prest</a>; <a href="https://eprint.iacr.org/2023/042">Genêt</a>). The budgets do not include countermeasures: recomputing and comparing at least doubles signing, and verifying before release catches few faults. One-time signatures of upper layers precomputed by keygen and stored in the cache are immune, since signing only copies them.</dd></div>
             <div><dt>Choice of hash function</dt><dd>The oracle <a href="#oracle-definition"><code>H</code></a> takes inputs made of 64-byte blocks, returns 32-byte answers, and costs one compression per block. This cost model is accurate for BLAKE2s, for BLAKE3 on inputs up to 1 KiB, and for the SHA-256 compression function, but less precise for standard SHA-256, whose padding adds a block to every input, and for SHA-3, which absorbs 136 bytes per permutation.</dd></div>
             <div><dt>Choice of ISA and metering</dt><dd>RV64IM, the <a href="#model">cost of each instruction</a>, and details such as <a href="#system-calls">where HASH reads its inputs</a> are one choice among many, and may not match a given zkVM.</dd></div>
             <div><dt>Delegating hashes of public values</dt><dd>The budgets assume the enclave, such as a hardware wallet, computes every hash. Hashes of public values, typically for grinding, could be offloaded to a powerful host, possibly with a SNARK proving correctness.</dd></div>
