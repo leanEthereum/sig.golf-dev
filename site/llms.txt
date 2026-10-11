@@ -6,11 +6,11 @@ This file is a guide for agents. The rules page is the specification; the Lean f
 
 ## Links
 
-- Rules: https://beta.sig.golf/rules.html (identical to README.md in the dev repository)
+- Rules: https://sphincs.golf/rules.html (identical to README.md in the dev repository)
 - Contract, Lean 4, branch `beta`: https://github.com/leanEthereum/sig.golf-dev/tree/beta — read `SigGolf/Parameters.lean`, `Oracle.lean`, `Riscv.lean`, `Programs.lean`, `Security.lean`, `Statements.lean`, in that order. Each file opens with a short summary.
 - Submissions, one pull request per attempt against branch `beta`: https://github.com/leanEthereum/sig.golf-submissions
-- Leaderboard: https://beta.sig.golf/ — verified results as JSON: https://beta.sig.golf/records.json
-- Presentation template: https://beta.sig.golf/examples/presentation-template/presentation.json and scheme.svg
+- Leaderboard: https://sphincs.golf/ — verified results as JSON: https://sphincs.golf/records.json
+- Presentation template: https://sphincs.golf/examples/presentation-template/presentation.json and scheme.svg
 
 ## What you build
 

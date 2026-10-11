@@ -65,7 +65,7 @@ class Github:
             raise GithubError('invalid status')
         self.post(f'/repos/{REPO}/statuses/{commit}',
                   {'state': state, 'context': context, 'description': description[:140],
-                   'target_url': 'https://beta.sig.golf/'})
+                   'target_url': 'https://sphincs.golf/'})
 
     def _pr_root_items(self, commit: str) -> list[dict]:
         info = self.get(f'/repos/{REPO}/git/commits/{commit}')

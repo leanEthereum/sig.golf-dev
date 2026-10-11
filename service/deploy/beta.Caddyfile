@@ -1,9 +1,9 @@
-beta.sig.golf {
+sphincs.golf {
     encode zstd gzip
     root * /srv/sig-golf/public/site
     redir /site / 308
     handle_path /site/* {
-        redir https://beta.sig.golf{uri} 308
+        redir https://sphincs.golf{uri} 308
     }
     handle {
         file_server
@@ -16,4 +16,8 @@ beta.sig.golf {
         Referrer-Policy "strict-origin-when-cross-origin"
         Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://raw.githubusercontent.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
     }
+}
+
+beta.sig.golf, www.sphincs.golf {
+    redir https://sphincs.golf{uri} 308
 }
