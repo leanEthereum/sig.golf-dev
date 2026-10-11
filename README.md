@@ -15,8 +15,8 @@ Five constants depend on the [track](#tracks):
 
 | Constant        |                `full` |         `constrained` |              `laptop` |
 | --------------- | --------------------: | --------------------: | --------------------: |
-| `BUDGET_KEYGEN` |     2^20 compressions |    60 s on the device |    60 s on the device |
-| `BUDGET_SIGN`   |     2^17 compressions |     2 s on the device |     2 s on the device |
+| `BUDGET_KEYGEN` |     2^20 compressions |     2^20 compressions |     2^31 compressions |
+| `BUDGET_SIGN`   |     2^17 compressions |     2^15 compressions |     2^26 compressions |
 | `BUDGET_EXPAND` |     2^20 compressions |     2^20 compressions |     2^20 compressions |
 | `LIFETIME`      | 2^32 signing requests | 2^16 signing requests | 2^32 signing requests |
 | `CYCLE_LIMIT`   |           2^32 cycles | 2^32, see [Tracks](#tracks) | 2^32, see [Tracks](#tracks) |
@@ -42,28 +42,25 @@ Every object has a fixed size in bytes:
 
 ## Tracks
 
-Every track scores `S × C` with the same programs, model, and statements. `full` sets its budgets in compressions. The hardware tracks budget keygen and signing in time on a device, to find the schemes best suited to keygen and signing on hardware:
+Every track scores `S × C` with the same programs, model, and statements, and H is an unnamed random oracle on every track. `full` sets its budgets in compressions. The hardware tracks budget keygen and signing by what a device hashes in 60 s and 2 s, rounded to powers of two, to find the schemes best suited to keygen and signing on hardware:
 
-- **`constrained`:** a Ledger Nano S+: an ST33K1M5 secure element, a Cortex-M35P at 63 MHz with no hash hardware.
-- **`laptop`:** a laptop CPU with SHA-256 instructions (Intel SHA-NI, ARMv8 SHA2, as on Apple silicon).
+| Track         | Device                                                        | Compressions per second | `BUDGET_SIGN`  | `BUDGET_KEYGEN` |
+| ------------- | ------------------------------------------------------------- | ----------------------: | -------------: | --------------: |
+| `constrained` | Ledger Nano S+: ST33K1M5 secure element, Cortex-M35P, 63 MHz  |                 ≈ 18,500 | 2^15 (1.8 s)   | 2^20 (57 s)     |
+| `laptop`      | one laptop core                                               |                   ≈ 2^25 | 2^26 (2 s)     | 2^31 (64 s)     |
 
-As on `full`, H is an unnamed random oracle. A hardware track's `BUDGET_SIGN` and `BUDGET_KEYGEN` are the compressions its device completes in 2 s and 60 s with its fastest hash. As in `full`, a budget bounds `E[2^(N_P / BUDGET_P)]`, not every run, so a rare run may take longer.
-
-| Device        | Fastest hash               | Compressions per second | `BUDGET_SIGN` | `BUDGET_KEYGEN` |
-| ------------- | -------------------------- | ----------------------: | ------------: | --------------: |
-| `constrained` | BLAKE2s                    |                  33,000 |        66,000 |       1,980,000 |
-| `laptop`      | SHA-256 compression        |             625,000,000 | 1,250,000,000 |  37,500,000,000 |
-
-The secure element hashes in software, where BLAKE2s is faster than SHA-256 (25,000 per second). With SHA-256 instructions, the SHA-256 compression function is 5/2 times faster than BLAKE2s (250,000,000 per second): on long messages, eBACS measures 2.05 against 5.24 cycles per byte on Intel Alder Lake, and 2.03 against 6.22 on an ARM Cortex-A76. The laptop rate counts all cores and SIMD lanes.
+- **Nano S+ rate:** Blockstream's SLH-DSA-SHA2-128s app hashes SHA-256 inside the app and takes 15.82 s for keygen and 120.12 s for signing: about 292,000 and 2,218,000 compressions, both 18,480 per second. Hashing through the operating system's crypto calls is about 25 times slower; the budgets assume in-app hashing.
+- **Laptop rate:** independent one-block compressions on one core run at 2^24.3 per second with SHA-NI on an Intel Core Ultra 7 155H (8-lane AVX2 BLAKE2s: 2^24.1) and about 2^25.4 with the SHA-256 instructions of an Apple M2. One core keeps the budget independent of core counts.
+- **Expectation:** as on `full`, a budget bounds `E[2^(N_P / BUDGET_P)]`, not every run, so a rare run may take longer. The time limits count computation only: transferring the signature to the host is not counted, and a device may split the work across requests.
 
 `expand` and `verify` run on the verifier's side, so they keep `full`'s `BUDGET_EXPAND` and `CYCLE_LIMIT` on every track. Keygen and sign get their own cycle limits:
 
-| Program  |                `constrained` | `laptop` |
-| -------- | ---------------------------: | -------: |
-| `keygen` | 60 s × 63 MHz = 3,780,000,000 |     2^40 |
-| `sign`   |   2 s × 63 MHz = 126,000,000 |     2^40 |
+| Program  | `constrained`              | `laptop` |
+| -------- | -------------------------- | -------: |
+| `keygen` | 2^32 (68 s at 63 MHz)      |     2^40 |
+| `sign`   | 2^27 (2.1 s at 63 MHz)     |     2^40 |
 
-On `constrained` they are the device clock, so work besides hashing also fits the time limits; on `laptop`, 2^40 makes the keygen budget reachable at 8 cycles per compression.
+On `constrained` they follow the device clock, so work besides hashing also fits the time limits; on `laptop`, 2^40 is far above the keygen budget at 8 cycles per compression.
 
 **Nano S+ memory.** On `constrained`, keygen and sign run in the memory a Nano S+ gives an app, from the Ledger SDK's `nanos2` linker script: 40 KiB of RAM and 400 KiB of flash.
 
@@ -71,7 +68,7 @@ On `constrained` they are the device clock, so work besides hashing also fits th
 - **Flash** holds the keygen and sign images and the cache: their `4 × instructions + embedded data bytes`, plus `K`, are at most 409,600 bytes. Keygen writes the cache and sign only reads it; both only read their embedded data.
 - Any other load, store, or HASH input or output address fails the run, like an out-of-bounds access.
 
-**Pruning.** The constrained track's smaller `LIFETIME` lets a scheme trade signatures for cheaper keygen and signing, for example by [hypertree pruning](https://conduition.io/cryptography/hypertree-pruning/): the signer replaces most hypertree leaves with cheap surrogate hashes and grinds its randomizer until the message lands on a kept leaf. Keeping a fraction f of the few-time-signature leaves multiplies the safe number of signatures by f, and grinding costs about 1/f compressions per signature, charged to `BUDGET_SIGN`; verification is unchanged.
+**Lifetime and overuse.** The constrained track's `LIFETIME` is 2^16 signing requests. Wallets do not count signatures reliably, so security must degrade gracefully past it: with up to 2^20 requests, 16 times the lifetime, a forgery must still have probability at most `Q / 2^96`. The smaller lifetime lets a scheme trade signatures for cheaper keygen and signing, for example by [hypertree pruning](https://conduition.io/cryptography/hypertree-pruning/): the signer replaces most hypertree leaves with cheap surrogate hashes and grinds its randomizer until the message lands on a kept leaf. Keeping a fraction f of the few-time-signature leaves multiplies the safe number of signatures by f, and grinding costs about 1/f compressions per signature, charged to `BUDGET_SIGN`; verification is unchanged.
 
 ## Programs
 
@@ -169,7 +166,7 @@ Consider the following experiment for a classical probabilistic adversary `A` wi
 
 The total hash-call count includes key generation, signing, `A`’s queries, and final expansion and verification when performed.
 
-**Security** ([Lean statement](SigGolf/Statements.lean#L40-L45)): for every A and `Q >= 1`, `Pr[A wins] <= Q / 2^SECURITY_BITS`, over the secret key, H, and `A`’s private randomness.
+**Security** ([Lean statement](SigGolf/Statements.lean#L40-L45)): for every A and `Q >= 1`, `Pr[A wins] <= Q / 2^SECURITY_BITS`, over the secret key, H, and `A`’s private randomness. On `constrained`, also `Pr[A wins] <= Q / 2^96` when A may make 2^20 signing requests ([overuse](#tracks)).
 
 ### Termination
 
@@ -232,7 +229,8 @@ Build the statements and regression checks with `lake build SigGolf SigGolfTests
 - **Quantum security:** the security game only considers classical adversaries. NIST level 1 requires ≈ 64 bits of security against quantum adversaries.
 - **Single-user security:** the security game targets a single key, but a real attacker can target many users at once. The standard defense starts every hash with a per-key public parameter, so work against one user is useless against others. Drake's trick makes this cheap: a 16-byte parameter in the public key, padded with 48 zero bytes, fills the first 64-byte block of every hash, so its hash state is computed once and reused. Multi-user security then costs one compression and 16 bytes of public key.
 - **MPC for threshold signing:** the `constrained` track's budgets let hardware wallets sign. Threshold signing runs keygen and sign inside multi-party computation (MPC), where hashing secret data costs far more. MPC precomputation followed by grinding on public values at signing can help (see [RivaLabs](https://github.com/RivaLabs-Core)).
-- **Device model:** the hardware budgets count compressions at one rate per device and hash, and on `constrained` the cycle limits and memory rules bound everything else; RISC-V instructions stand in for the device's own, and communication with the host is not modeled.
+- **Device model:** the hardware budgets count compressions at one measured rate per device, and on `constrained` the cycle limits and memory rules bound everything else; RISC-V instructions stand in for the device's own, and communication with the host is not modeled.
+- **Fault attacks:** a hardware wallet faces glitching, and one faulted signature can give a universal forgery against SPHINCS-like schemes ([Castelnovi, Martinelli, Prest](https://eprint.iacr.org/2018/102); [Genêt](https://eprint.iacr.org/2023/042)). The budgets do not include countermeasures: recomputing and comparing at least doubles signing, and verifying before release catches few faults. One-time signatures of upper layers precomputed by keygen and stored in the cache are immune, since signing only copies them.
 - **Choice of hash function:** the oracle H takes inputs made of 64-byte blocks, returns 32-byte answers, and costs one compression per block. This cost model is accurate for BLAKE2s, for BLAKE3 on inputs up to 1 KiB, and for the SHA-256 compression function, but less precise for standard SHA-256, whose padding adds a block to every input, and for SHA-3, which absorbs 136 bytes per permutation.
 - **Choice of ISA and metering:** RV64IM, the [cost of each instruction](#risc-v-programs), and details such as [where HASH reads its inputs](#system-calls) are one choice among many, and may not match a given zkVM.
 - **Delegating hashes of public values:** the budgets assume the enclave, such as a hardware wallet, computes every hash. Hashes of public values, typically for grinding, could be offloaded to a powerful host, possibly with a SNARK proving correctness.

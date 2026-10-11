@@ -39,7 +39,7 @@ The only hash is the syscall HASH, a random oracle on inputs of 64·k bytes retu
 
 Memory faults, misaligned accesses, invalid HASH arguments, unknown syscalls, EBREAK, and HALT with a nonzero code fail the program at 1 cycle with no oracle call; an invalid fetch or encoding fails at 0 cycles. A failed verify is a rejection.
 
-Honest budgets, in 64-byte compressions: keygen 2^20, sign 2^17, expand 2^20. Verify has no budget; its cycles are the score. These are the `full` track's. This repository's `constrained` and `laptop` tracks instead allow 60 s of keygen and 2 s of signing on a Ledger Nano S+ or a laptop, at the device's fastest compression rate (H stays an unnamed random oracle), with 2^16 or 2^32 signing requests. Expand and verify keep the 2^32 cycle limit; keygen and sign get the Nano S+ clock (63 MHz × the time limit) or 2^40. On `constrained`, keygen and sign may only use the Nano S+'s 40 KiB of RAM (addresses below 40,960, which must hold the message, keys, and signature), the cache (written by keygen only), and read-only embedded data, and the two images plus the cache fit in 400 KiB of flash; see the Tracks section of RULES.md.
+Honest budgets, in 64-byte compressions: keygen 2^20, sign 2^17, expand 2^20. Verify has no budget; its cycles are the score. These are the `full` track's. This repository's `constrained` and `laptop` tracks instead budget about 60 s of keygen and 2 s of signing on a Ledger Nano S+ (keygen 2^20, sign 2^15, at its measured ≈ 18,500 in-app SHA-256 compressions per second) or on one laptop core (keygen 2^31, sign 2^26, at ≈ 2^25 per second); H stays an unnamed random oracle. They allow 2^16 or 2^32 signing requests; on `constrained`, security must also stay at Q / 2^96 with 2^20 requests. Expand and verify keep the 2^32 cycle limit; keygen and sign get 2^32 and 2^27 on `constrained` (the Nano S+ clock) or 2^40 on `laptop`. On `constrained`, keygen and sign may only use the Nano S+'s 40 KiB of RAM (addresses below 40,960, which must hold the message, keys, and signature), the cache (written by keygen only), and read-only embedded data, and the two images plus the cache fit in 400 KiB of flash; see the Tracks section of RULES.md.
 
 ## What the certificate proves
 
@@ -49,7 +49,7 @@ Honest budgets, in 64-byte compressions: keygen 2^20, sign 2^17, expand 2^20. Ve
 2. **completeness** — for every secret key, with probability at least 1 − 2^-128 over the oracle, keygen, sign, expand, verify succeed for every message under that one oracle.
 3. **compressionBudgets** — for every secret key and P in {keygen, sign, expand}, E[2^(N_P / BUDGET_P)] ≤ 2 over a fresh oracle and a uniform message, where N_P is P's compressions in the honest pipeline.
 4. **verificationCycles** — for every oracle, key, and message where the honest pipeline succeeds, verify's cycles plus the witness charge are at most C.
-5. **security** — the forgery game below, at every hash budget Q ≥ 1: Pr[win with at most Q total calls] ≤ Q / 2^127.
+5. **security** — the forgery game below, at every hash budget Q ≥ 1: Pr[win with at most Q total calls] ≤ Q / 2^127. On `constrained`, also ≤ Q / 2^96 when the adversary may make 2^20 signing requests instead of 2^16.
 6. **termination** — every program halts in fewer than 2^32 cycles on every typed input and every oracle, including adversarial caches, signatures, and witnesses.
 
 ## The security game, condensed

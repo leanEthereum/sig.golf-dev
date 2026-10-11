@@ -95,29 +95,25 @@ def witnessCharge (bytes : Nat) : Nat := (bytes + 255) / 256
 /-! ### Tracks
 
 `Statements` uses the constants above, the `full` track's. The `constrained` and `laptop` tracks
-price keygen and sign on a device instead: a budget is the compressions the device completes in
-`KEYGEN_SECONDS` or `SIGN_SECONDS`. As on `full`, `H` is an unnamed random oracle. -/
-
-def KEYGEN_SECONDS : Nat := 60
-def SIGN_SECONDS : Nat := 2
+budget keygen and sign by what a device hashes in 60 s and 2 s, rounded to powers of two. As on
+`full`, `H` is an unnamed random oracle. -/
 
 inductive Device where
   /-- A Ledger Nano S+: an ST33K1M5 secure element, a Cortex-M35P at 63 MHz. -/
   | constrained
-  /-- A laptop CPU with SHA-256 instructions (Intel SHA-NI, ARMv8 SHA2). -/
+  /-- One laptop core. -/
   | laptop
   deriving DecidableEq
 
-/-- Compressions per second with the device's fastest hash. The secure element has no hash
-hardware, and BLAKE2s is fastest in software; the laptop's SHA-256 instructions make the SHA-256
-compression function 5/2 times faster than BLAKE2s, at 250,000,000. -/
-def Device.rate : Device → Nat
-  | .constrained => 33000
-  | .laptop => 625000000
+/-- The Nano S+ hashes about 18,500 compressions per second inside an app: Blockstream's
+SLH-DSA-SHA2-128s keygen and signing timings give 18,480. So 2^20 compressions take 57 s and 2^15
+take 1.8 s. -/
+def NANO_BUDGET_KEYGEN : Nat := 2 ^ 20
+def NANO_BUDGET_SIGN : Nat := 2 ^ 15
 
-/-- Whole compressions in `seconds`. -/
-def Device.compressions (device : Device) (seconds : Nat) : Nat :=
-  seconds * device.rate
+/-- At 63 MHz, 2^32 cycles take 68 s and 2^27 take 2.1 s, so work besides hashing also fits. -/
+def NANO_CYCLE_LIMIT_KEYGEN : Nat := 2 ^ 32
+def NANO_CYCLE_LIMIT_SIGN : Nat := 2 ^ 27
 
 /-- An app's SRAM on the Nano S+, from the Ledger SDK's `nanos2` linker script. -/
 def NANO_RAM_BYTES : Nat := 40 * 1024
@@ -125,15 +121,22 @@ def NANO_RAM_BYTES : Nat := 40 * 1024
 /-- An app's flash on the Nano S+, code and data, from the same linker script. -/
 def NANO_FLASH_BYTES : Nat := 400 * 1024
 
-/-- The Nano S+ clock: keygen and sign run at most this many cycles per second. -/
-def NANO_HZ : Nat := 63000000
-
 /-- Signing requests on the `constrained` track: fewer signatures for cheaper keygen and signing,
 the trade hypertree pruning makes. -/
 def CONSTRAINED_LIFETIME : Nat := 2 ^ 16
 
-/-- The `laptop` track's cycle limit for keygen and sign, high enough for its keygen budget at 8
-cycles per compression. -/
+/-- The overuse margin on `constrained`: with 16 times `CONSTRAINED_LIFETIME` signing requests, a
+forgery still has probability at most `Q / 2 ^ OVERUSE_SECURITY_BITS`. -/
+def OVERUSE_LIFETIME : Nat := 2 ^ 20
+def OVERUSE_SECURITY_BITS : Nat := 96
+
+/-- One laptop core hashes about 2^25 compressions per second: 2^24.3 measured with SHA-NI on an
+Intel Core Ultra 7 155H, about 2^25.4 on an Apple M2. So 2^31 take 64 s and 2^26 take 2 s. -/
+def LAPTOP_BUDGET_KEYGEN : Nat := 2 ^ 31
+def LAPTOP_BUDGET_SIGN : Nat := 2 ^ 26
+
+/-- The `laptop` track's cycle limit for keygen and sign, far above its keygen budget at 8 cycles
+per compression. -/
 def LAPTOP_CYCLE_LIMIT : Nat := 2 ^ 40
 
 /-- The memory keygen and sign may use on a device: RAM is the addresses below `ramBytes`, and
@@ -143,7 +146,8 @@ structure DeviceMemory where
   flashBytes : Nat
 
 /-- What a track fixes: the honest budgets in compressions, the signing requests the adversary may
-make, each program's cycle limit, and the device memory keygen and sign run in, if any. -/
+make, each program's cycle limit, the device memory keygen and sign run in, if any, and an
+overuse margin `(lifetime, bits)`, if any: a weaker security bound for a larger lifetime. -/
 structure Rules where
   keygenBudget : Nat
   signBudget : Nat
@@ -151,6 +155,7 @@ structure Rules where
   lifetime : Nat
   cycleLimit : Program → Nat
   memory : Option DeviceMemory
+  overuse : Option (Nat × Nat)
 
 /-- `Program.budget` under `rules`. -/
 def Rules.budget (rules : Rules) : Program → Option Nat
@@ -160,24 +165,31 @@ def Rules.budget (rules : Rules) : Program → Option Nat
   | .verify => none
 
 def Rules.full : Rules :=
-  ⟨BUDGET_KEYGEN, BUDGET_SIGN, BUDGET_EXPAND, LIFETIME, fun _ => CYCLE_LIMIT, none⟩
+  ⟨BUDGET_KEYGEN, BUDGET_SIGN, BUDGET_EXPAND, LIFETIME, fun _ => CYCLE_LIMIT, none, none⟩
 
 /-- A hardware track. `expand` and `verify` keep `full`'s budget and cycle limit: they run on
 the verifier's side, not on the device. -/
-def Device.rules (device : Device) : Rules where
-  keygenBudget := device.compressions KEYGEN_SECONDS
-  signBudget := device.compressions SIGN_SECONDS
-  expandBudget := BUDGET_EXPAND
-  lifetime := match device with
-    | .constrained => CONSTRAINED_LIFETIME
-    | .laptop => LIFETIME
-  cycleLimit program := match device, program with
-    | .constrained, .keygen => KEYGEN_SECONDS * NANO_HZ
-    | .constrained, .sign => SIGN_SECONDS * NANO_HZ
-    | .laptop, .keygen | .laptop, .sign => LAPTOP_CYCLE_LIMIT
-    | _, .expand | _, .verify => CYCLE_LIMIT
-  memory := match device with
-    | .constrained => some ⟨NANO_RAM_BYTES, NANO_FLASH_BYTES⟩
-    | .laptop => none
+def Device.rules : Device → Rules
+  | .constrained =>
+    { keygenBudget := NANO_BUDGET_KEYGEN
+      signBudget := NANO_BUDGET_SIGN
+      expandBudget := BUDGET_EXPAND
+      lifetime := CONSTRAINED_LIFETIME
+      cycleLimit := fun
+        | .keygen => NANO_CYCLE_LIMIT_KEYGEN
+        | .sign => NANO_CYCLE_LIMIT_SIGN
+        | .expand | .verify => CYCLE_LIMIT
+      memory := some ⟨NANO_RAM_BYTES, NANO_FLASH_BYTES⟩
+      overuse := some (OVERUSE_LIFETIME, OVERUSE_SECURITY_BITS) }
+  | .laptop =>
+    { keygenBudget := LAPTOP_BUDGET_KEYGEN
+      signBudget := LAPTOP_BUDGET_SIGN
+      expandBudget := BUDGET_EXPAND
+      lifetime := LIFETIME
+      cycleLimit := fun
+        | .keygen | .sign => LAPTOP_CYCLE_LIMIT
+        | .expand | .verify => CYCLE_LIMIT
+      memory := none
+      overuse := none }
 
 end SigGolf

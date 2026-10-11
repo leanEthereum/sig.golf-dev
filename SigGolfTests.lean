@@ -78,30 +78,35 @@ example : ¬ nanoRules.Admission { nano with layout := { nanoLayout with signatu
   decide
 example : ¬ nanoRules.Admission toy := by decide
 
--- Hardware tracks: each budget is the device's whole compressions in the allowed time.
-example : (Device.rules .constrained).signBudget = 66000 ∧
-    (Device.rules .constrained).keygenBudget = 1980000 ∧
-    (Device.rules .laptop).signBudget = 1250000000 ∧
-    (Device.rules .laptop).keygenBudget = 37500000000 := by decide
-example : (Device.rules .constrained).lifetime = 2 ^ 16 ∧
+-- Hardware tracks: budgets, lifetimes, cycle limits, and overuse margins.
+example : (Device.rules .constrained).signBudget = 32768 ∧
+    (Device.rules .constrained).keygenBudget = 1048576 ∧
+    (Device.rules .laptop).signBudget = 67108864 ∧
+    (Device.rules .laptop).keygenBudget = 2147483648 ∧
+    (Device.rules .constrained).lifetime = 2 ^ 16 ∧
     (Device.rules .laptop).lifetime = 2 ^ 32 ∧
-    (Device.rules .constrained).expandBudget = 2 ^ 20 ∧
-    (Device.rules .laptop).expandBudget = 2 ^ 20 ∧
-    (Device.rules .constrained).cycleLimit .keygen = 3780000000 ∧
-    (Device.rules .constrained).cycleLimit .sign = 126000000 ∧
+    (Device.rules .constrained).cycleLimit .keygen = 2 ^ 32 ∧
+    (Device.rules .constrained).cycleLimit .sign = 2 ^ 27 ∧
     (Device.rules .laptop).cycleLimit .keygen = 2 ^ 40 ∧
     (Device.rules .laptop).cycleLimit .sign = 2 ^ 40 := by decide
--- `expand` and `verify` keep `full`'s cycle limit on every track.
+example : (Device.rules .constrained).overuse = some (2 ^ 20, 96) ∧
+    (Device.rules .laptop).overuse = none ∧ Rules.full.overuse = none := by decide
+-- On `constrained`, security is 127 bits within 2^16 requests and 96 bits within 2^20.
+example (submission : Submission) : (Device.rules .constrained).Security submission ↔
+    (Device.rules .constrained).SecurityBound submission 127 ∧
+      ({ Device.rules .constrained with lifetime := 2 ^ 20 } : Rules).SecurityBound submission 96 :=
+  Iff.rfl
+-- `expand` and `verify` keep `full`'s budget and cycle limit on every track.
 example (device : Device) :
+    (Device.rules device).expandBudget = BUDGET_EXPAND ∧
     (Device.rules device).cycleLimit .expand = CYCLE_LIMIT ∧
     (Device.rules device).cycleLimit .verify = CYCLE_LIMIT := by
-  cases device <;> exact ⟨rfl, rfl⟩
--- Each budget fits its cycle limit at 8 cycles per compression.
-example : 8 * Device.compressions .laptop KEYGEN_SECONDS < LAPTOP_CYCLE_LIMIT ∧
-    8 * Device.compressions .laptop SIGN_SECONDS < LAPTOP_CYCLE_LIMIT ∧
-    8 * Device.compressions .constrained KEYGEN_SECONDS < KEYGEN_SECONDS * NANO_HZ ∧
-    8 * Device.compressions .constrained SIGN_SECONDS < SIGN_SECONDS * NANO_HZ ∧
-    KEYGEN_SECONDS * NANO_HZ < CYCLE_LIMIT := by decide
+  cases device <;> exact ⟨rfl, rfl, rfl⟩
+-- Each keygen and sign budget fits its cycle limit at 8 cycles per compression.
+example (device : Device) :
+    8 * (Device.rules device).keygenBudget < (Device.rules device).cycleLimit .keygen ∧
+    8 * (Device.rules device).signBudget < (Device.rules device).cycleLimit .sign := by
+  cases device <;> decide
 -- Under `Rules.full` the restatement is the original contract.
 example : Riscv.executeWith none = Riscv.execute := rfl
 example : Rules.full.budget = Program.budget := by funext program; cases program <;> rfl

@@ -4,8 +4,9 @@ import SigGolf.Statements
 
 The `constrained` and `laptop` tracks restate `Riscv.execute`, `Programs`, `Security`, and
 `Statements` under a track's `Rules`: its budgets, `lifetime`, and per-program `cycleLimit` replace
-`BUDGET_KEYGEN`, `BUDGET_SIGN`, `BUDGET_EXPAND`, `LIFETIME`, and `CYCLE_LIMIT`, and its device
-`memory`, if any, restricts the addresses keygen and sign access and adds a device admission.
+`BUDGET_KEYGEN`, `BUDGET_SIGN`, `BUDGET_EXPAND`, `LIFETIME`, and `CYCLE_LIMIT`; its device
+`memory`, if any, restricts the addresses keygen and sign access and adds a device admission; and
+its `overuse` margin, if any, adds a weaker security bound for a larger lifetime.
 Each definition copies the original of the same name and changes only those, so under
 `Rules.full` it unfolds to the original, which `SigGolfTests` checks. A hardware-track certificate
 is `(Device.rules device).Certificate submission C`. -/
@@ -225,10 +226,20 @@ def VerificationCycles (submission : Submission) (C : Nat) : Prop :=
     let result := evalWithAnswerFn hash (rules.honest submission secretKey message)
     result.success = true → result.verificationCycles ≤ C
 
-def Security (submission : Submission) : Prop :=
+/-- A forgery within `rules.lifetime` signing requests has probability at most `Q / 2 ^ bits`. -/
+def SecurityBound (submission : Submission) (bits : Nat) : Prop :=
   ∀ (adversary : Adversary submission.sizes) (Q : Nat), 1 ≤ Q →
     Pr[fun (won, calls) => won = true ∧ calls ≤ Q | rules.securityExperiment submission adversary]
-      ≤ (Q : ENNReal) / 2 ^ SECURITY_BITS
+      ≤ (Q : ENNReal) / 2 ^ bits
+
+/-- `SECURITY_BITS` within the lifetime, and with an overuse margin `(lifetime, bits)`, also `bits`
+within that larger lifetime. -/
+def Security (submission : Submission) : Prop :=
+  match rules.overuse with
+  | none => rules.SecurityBound submission SECURITY_BITS
+  | some (lifetime, bits) =>
+      rules.SecurityBound submission SECURITY_BITS ∧
+        ({ rules with lifetime := lifetime } : Rules).SecurityBound submission bits
 
 def Termination (submission : Submission) : Prop :=
   ∀ (hash : Hash) (program : Program) (input : Input submission.sizes program),
